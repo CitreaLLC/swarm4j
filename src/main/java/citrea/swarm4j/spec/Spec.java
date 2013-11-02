@@ -1,5 +1,6 @@
 package citrea.swarm4j.spec;
 
+import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -14,158 +15,172 @@ import java.util.regex.Pattern;
 public class Spec {
 
     public static final String RS_Q_TOK_EXT = ("([$])(=(?:\\+=)?)")
-            .replaceAll("$", SpecQuant.allCodes)
+            .replaceAll("\\$", SpecQuant.allCodes)
             .replaceAll("=", SpecToken.RS_TOK);
-
-    public static final long EPOCH = 1262275200000L; // 1 Jan 2010 (milliseconds)
 
     public static final String BASE64 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz~";
 
-    private String type;
-    private String id;
-    private String member;
-    private String version;
+    private SpecToken[] tokens;
 
     public Spec (Spec copy) {
-        this.type = copy.type;
-        this.id = copy.id;
-        this.member = copy.member;
-        this.version = copy.version;
+        this.tokens = Arrays.copyOf(copy.tokens, copy.tokens.length);
+    }
+
+    private Spec (SpecToken[] tokens) {
+        this.tokens = tokens;
+    }
+
+    public Spec (SpecToken type, SpecToken id) {
+        this.tokens = new SpecToken[] { type, id };
+    }
+
+    public Spec (SpecToken type, SpecToken id, SpecToken member) {
+        this.tokens = new SpecToken[] { type, id, member };
+    }
+
+    public Spec (SpecToken type, SpecToken id, SpecToken member, SpecToken version) {
+        this.tokens = new SpecToken[] { type, id, member, version };
     }
 
     public Spec (String specAsString) {
-        this.type = null;
-        this.id = null;
-        this.member = null;
-        this.version = null;
+
         if (specAsString == null) {
-            return;
+            this.tokens = new SpecToken[0];
         }
 
         Pattern pattern = Pattern.compile(RS_Q_TOK_EXT);
         Matcher matcher = pattern.matcher(specAsString);
+        int tokensCount = 0;
+        int last = -2;
+        tokens = new SpecToken[4];
         while (matcher.find()) {
-            SpecQuant quant = SpecQuant.forCode(matcher.group(1));
+            SpecQuant quant = SpecQuant.byCode(matcher.group(1));
+            int order = quant.ordinal();
             String token = matcher.group(2);
-            switch (quant) {
-                case TYPE:
-                    this.type = token;
-                    break;
-                case MEMBER:
-                    this.member = token;
-                    break;
-                case ID:
-                    this.id = token;
-                    break;
-                case VERSION:
-                    this.version = token;
-                    break;
-                default:
-                    //TODO skip or throw Exception ?
+            tokens[order] = new SpecToken(token);
+            if (last < order) {
+                last = order;
             }
+            tokensCount++;
         }
+        if (tokensCount != last + 1) {
+            throw new IllegalArgumentException("Malformed specifier: missing tokens");
+        }
+        tokens = Arrays.copyOf(tokens, tokensCount);
     }
 
-    @Override
-    public String toString() {
-        return (this.type != null ? SpecQuant.TYPE.toString() + this.type : "") +
-                (this.member != null ? SpecQuant.MEMBER.toString() + this.member : "") +
-                (this.id != null ? SpecQuant.ID.toString() + this.id : "") +
-                (this.version != null ? SpecQuant.VERSION.toString() + this.version : "");
-    }
-
-    //TODO what about making Spec unmutable? then build new scoped Spec here
-    public void setScope(Spec scope) {
-        if (scope.type != null) {
-            this.type = scope.type;
-        }
-        if (scope.member != null) {
-            this.member = scope.member;
-        }
-        if (scope.id != null) {
-            this.id = scope.id;
-        }
-        if (scope.version != null) {
-            this.version = scope.version;
-        }
-    }
-
-    //TODO can be cached if Spec is unmutable
-    public boolean isEmpty() {
-        return this.type == null &&
-                this.member == null &&
-                this.id == null &&
-                this.version == null;
-    }
-
-
-    public Spec getParent() {
-        Spec ret = new Spec(this);
-        if (ret.version != null) {
-            ret.version = null;
-        } else if (ret.member != null) {
-            ret.member = null;
-        } else if (ret.id != null) {
-            ret.id = null;
-        } else if (ret.type != null) {
-            ret.type = null;
+    public Spec buildParent() {
+        int len = this.tokens.length;
+        Spec ret;
+        if (len >= 1) {
+            ret = new Spec(Arrays.copyOf(this.tokens, this.tokens.length - 1));
+        } else {
+            ret = new Spec((String) null);
         }
         return ret;
     }
 
-    public Spec child(String id) {
-        Spec child = new Spec(this);
-        if (child.type != null) {
-            child.type = id;
-        } else if (child.id != null) {
-            child.id = id;
-        } else if (child.member != null) {
-            child.member = id;
-        } else if (child.version != null) {
-            child.version = id;
-        } //TODO else throw exception or return clone?
-        return child;
-    }
-
-    public String getVersion() {
-        return version;
-    }
-
-    public SpecToken getVersionAsToken() {
-        return new SpecToken(version);
-    }
-
-    /* TODO ???
-    // 3-parameter signature
-    //  * specifier (or a base64 string)
-    //  * value anything but a function
-    //  * source/callback - anything that can receive events
-    public static void normalizeSig3(String host, Spec spec, Object value, Object source) {
-        int len = args.length;
-        if (len==0 || len>3) throw new IllegalArgumentException("invalid number of arguments");
-        if (typeof(args[len-1])=="function") {
-            args[len-1] = { set:args[len-1] }; /// BAD
-        }
-        if (len<3 && args[len-1] && typeof(args[len-1].set)==='function') {
-            args[2] = args[len-1];
-            args[len-1] = null;
-        }
-        if (!args[1] && typeof(args[0])==='object' &&
-                args[0].constructor!==Spec && args[0].constructor!==String) {
-            args[1] = args[0];
-            args[0] = null;
-        }
-        if (!args[0] || args[0].constructor!==Spec) {
-            if (args[0] && args[0].toString().replace(Spec.reQTokExt,'')==='') {
-                args[0] = new Spec(args[0].toString());
+    public Spec overrideToken(SpecQuant q, SpecToken id) {
+        SpecToken[] newTokens;
+        int len = this.tokens.length;
+        int order = q.ordinal();
+        if (order <= len - 1) { // remove token
+            if (id != null) {
+                newTokens = Arrays.copyOf(this.tokens, Math.min(order + 1, len));
+                newTokens[order] = id;
             } else {
-                var spec = new Spec(host.scope());
-                if (args[0])
-                    spec[host._childKey] = args[0].toString();
-                args[0] = spec;
+                newTokens = Arrays.copyOf(this.tokens, Math.min(order, len));
+            }
+        } else if (len == order + 1) { // replace token
+            newTokens = Arrays.copyOf(this.tokens, len);
+            newTokens[order] = id;
+        } else if (len == order) { // add token
+            newTokens = Arrays.copyOf(this.tokens, len + 1);
+            newTokens[len] = id;
+        } else { // incorrect
+            throw new IllegalArgumentException("trying to produce malformed specifier");
+        }
+        return new Spec(newTokens);
+    }
+
+    public boolean isEmpty() {
+        return tokens.length == 0;
+    }
+
+    public int getTokensCount() {
+        return tokens.length;
+    }
+
+    public SpecToken getToken(int idx) {
+        return (tokens.length >= idx + 1) ? tokens[idx] : null;
+    }
+
+    public SpecToken getToken(SpecQuant quant) {
+        return getToken(quant.ordinal());
+    }
+
+    public SpecToken getLastToken() {
+        int len = tokens.length;
+        return len > 0 ? tokens[len - 1] : null;
+    }
+
+    public SpecToken getType() {
+        return getToken(SpecQuant.TYPE);
+    }
+
+    public SpecToken getId() {
+        return getToken(SpecQuant.ID);
+    }
+
+    public SpecToken getMember() {
+        return getToken(SpecQuant.MEMBER);
+    }
+
+    public SpecToken getVersion() {
+        return getToken(SpecQuant.VERSION);
+    }
+
+    public String getVersionAsStr() {
+        SpecToken version = getVersion();
+        return version == null ? null : version.toString();
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder res = new StringBuilder();
+        for (int i = 0; i < tokens.length; i++) {
+            SpecToken token = tokens[i];
+            res.append(token.withQuant(SpecQuant.byOrder(i)));
+        }
+        return res.toString();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null) return false;
+        if (o instanceof String) {
+            return o.equals(this.toString());
+        }
+        if (getClass() != o.getClass()) return false;
+
+        Spec spec = (Spec) o;
+
+        return Arrays.equals(this.tokens, spec.tokens);
+    }
+
+    @Override
+    public int hashCode() {
+        int len = this.tokens.length;
+        int result = 0;
+        for (SpecQuant q : SpecQuant.values()) {
+            int idx = q.ordinal();
+            result *= 31;
+            if (idx < len) {
+                result += this.tokens[idx].hashCode();
             }
         }
+        return result;
     }
-    */
 
 }
