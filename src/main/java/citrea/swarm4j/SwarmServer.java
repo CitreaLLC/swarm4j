@@ -23,7 +23,6 @@ import java.net.UnknownHostException;
 @Component
 public class SwarmServer implements InitializingBean {
     public final Logger logger = LogManager.getLogger(SwarmServer.class.getName());
-    public final Marker markerRoot = MarkerManager.getMarker("SwarmServer");
 
     @Autowired
     private Utils utils;
@@ -48,13 +47,13 @@ public class SwarmServer implements InitializingBean {
     }
 
     public void stop() throws IOException, InterruptedException {
-        logger.info(markerRoot, "stopping");
+        logger.info("stopping");
         wsServer.stop();
     }
 
     public void start() throws UnknownHostException {
-        wsServer = new WSServerImpl(port, markerRoot, utils);
+        wsServer = new WSServerImpl(port, utils);
         wsServer.start();
-        logger.info(markerRoot, "started on port: " + port);
+        logger.info("started on port: " + port);
     }
 }
