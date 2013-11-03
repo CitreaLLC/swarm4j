@@ -1,5 +1,7 @@
 package citrea.swarm4j;
 
+import citrea.swarm4j.model.Swarm;
+import citrea.swarm4j.spec.SpecToken;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.Marker;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.Date;
 
 /**
  * Created with IntelliJ IDEA.
@@ -21,7 +24,7 @@ import java.net.UnknownHostException;
  * Time: 16:47
  */
 @Component
-public class SwarmServer implements InitializingBean {
+public class SwarmServer {
     public final Logger logger = LogManager.getLogger(SwarmServer.class.getName());
 
     @Autowired
@@ -31,15 +34,14 @@ public class SwarmServer implements InitializingBean {
     private int port;
 
     private WSServerImpl wsServer;
+    private Swarm swarm;
 
     public SwarmServer() {
 
     }
 
-    @Override
-    public void afterPropertiesSet() throws Exception {
-        WebSocketImpl.DEBUG = true;
-        start();
+    public void setSwarm(Swarm swarm) {
+        this.swarm = swarm;
     }
 
     public void sendToAll( String text ) throws InterruptedException {
@@ -52,7 +54,10 @@ public class SwarmServer implements InitializingBean {
     }
 
     public void start() throws UnknownHostException {
-        wsServer = new WSServerImpl(port, utils);
+        if (swarm == null) {
+            throw new RuntimeException("'swarm' property not set");
+        }
+        wsServer = new WSServerImpl(port, swarm, utils);
         wsServer.start();
         logger.info("started on port: " + port);
     }

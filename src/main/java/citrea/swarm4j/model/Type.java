@@ -1,5 +1,6 @@
 package citrea.swarm4j.model;
 
+import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.spec.SpecQuant;
 import citrea.swarm4j.spec.SpecToken;
@@ -14,7 +15,7 @@ import java.util.Set;
  *         Date: 29/10/13
  *         Time: 00:52
  */
-public class Type extends AbstractEventRelay<Model> {
+public class Type extends AbstractEventRelay<Model> implements EventRecipient {
 
     private Set<FieldDescription> fieldDescriptions = new HashSet<FieldDescription>();
 
@@ -47,10 +48,37 @@ public class Type extends AbstractEventRelay<Model> {
         return new Model(swarm, getSpec().overrideToken(SpecQuant.ID, id));
     }
 
+    @Override
+    public void on(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
+
+    }
+
+    @Override
+    public void off(Action action, Spec spec, EventRecipient source) throws SwarmException {
+
+    }
+
+    @Override
+    public void set(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
+        throw new SwarmUnsupportedActionException(Action.set);
+    }
+
     public static class FieldDescription {
         private SpecToken name;
         private JSONValue defaultValue;
         private SwarmValidator validator;
+
+        public FieldDescription(String name) {
+            this(name, null, null);
+        }
+
+        public FieldDescription(String name, JSONValue defaultValue) {
+            this(name, defaultValue, null);
+        }
+
+        public FieldDescription(String name, JSONValue defaultValue, SwarmValidator validator) {
+            this(new SpecToken(name), defaultValue, validator);
+        }
 
         public FieldDescription(SpecToken name) {
             this(name, null, null);

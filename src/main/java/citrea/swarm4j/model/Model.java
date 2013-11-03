@@ -57,7 +57,7 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
         }
 
         //send .reOn
-        source.on(Action.reOn, spec, this.getVersion(), this);
+        source.on(Action.reOn, getSpec(), this.getVersion(), this);
     }
 
     @Override

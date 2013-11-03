@@ -63,6 +63,9 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
         CHILD child = getChild(spec);
         if (child == null) {
             child = createNewChild(spec, value);
+            if (child != null) {
+                addChild(child.getId(), child);
+            }
         }
 
         if (child != null) {

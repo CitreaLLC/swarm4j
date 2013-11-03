@@ -14,7 +14,7 @@ import java.util.Date;
  */
 public class SpecToken {
 
-    public static final String RS_TOK = "[0-9A-Za-z_@]+";
+    public static final String RS_TOK = "[0-9A-Za-z_~]+";
     public static final String RS_TOK_EXT = "^(=)(?:\\+(=))?$".replaceAll("=", RS_TOK);
     public static final String NO_AUTHOR = "&_";
 

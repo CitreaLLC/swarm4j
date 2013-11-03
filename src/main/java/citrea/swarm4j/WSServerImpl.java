@@ -32,12 +32,10 @@ public class WSServerImpl extends WebSocketServer {
     private Swarm swarm;
     private Map<WebSocket, WSWrapper> knownPipes = new HashMap<WebSocket, WSWrapper>();
 
-    public WSServerImpl(int port, Utils utils) throws UnknownHostException {
+    public WSServerImpl(int port, Swarm swarm, Utils utils) throws UnknownHostException {
         super( new InetSocketAddress( port ) );
         this.utils = utils;
-        //TODO ??? is procId eq to time of start?
-        String procId = SpecToken.date2ts(new Date());
-        this.swarm = new Swarm(new SpecToken("Swarm"), new SpecToken(procId));
+        this.swarm = swarm;
     }
 
     @Override
