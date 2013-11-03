@@ -1,8 +1,10 @@
 package citrea.swarm4j;
 
 import citrea.swarm4j.model.*;
+import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.spec.SpecToken;
+import citrea.swarm4j.spec.SpecWithAction;
 import org.java_websocket.WebSocket;
 import org.json.JSONException;
 import org.json.JSONString;
@@ -15,7 +17,7 @@ import org.json.JSONStringer;
  *         Date: 31/10/13
  *         Time: 17:58
  */
-public class WSWrapper implements SubscribeReplyListener, HandshakeListener {
+public class WSWrapper implements HandshakeRecipient {
 
     public static enum State {
         NEW, KNOW_PEER, HANDSHAKEN
@@ -36,11 +38,12 @@ public class WSWrapper implements SubscribeReplyListener, HandshakeListener {
         this.state = State.NEW;
     }
 
-    public void sendSpecVal(Spec spec, JSONString value) {
+    public void sendOperation(Action action, Spec spec, JSONString value) {
+        SpecWithAction key = new SpecWithAction(spec, action);
         JSONStringer payload = new JSONStringer();
         try {
             payload.object();
-            payload.key(spec.toString());
+            payload.key(key.toString());
             payload.value(value);
             payload.endObject();
         } catch (JSONException e) {
@@ -73,13 +76,18 @@ public class WSWrapper implements SubscribeReplyListener, HandshakeListener {
     }
 
     @Override
-    public void reOn(Spec spec, JSONValue value) {
-        this.sendSpecVal(spec, value);
+    public void on(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
+        this.sendOperation(action, spec, value);
     }
 
     @Override
-    public void set(Spec spec, JSONValue value, SwarmEventListener listener) throws SwarmException {
-        this.sendSpecVal(spec, value);
+    public void off(Action action, Spec spec, EventRecipient source) throws SwarmException {
+        this.sendOperation(action, spec, null);
+    }
+
+    @Override
+    public void set(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
+        this.sendOperation(Action.set, spec, value);
     }
 
     public void close() throws SwarmException {

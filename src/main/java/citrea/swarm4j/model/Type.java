@@ -34,12 +34,12 @@ public class Type extends AbstractEventRelay<Model> {
         SpecToken id = spec.getId();
         Model res;
         if (id == null) { //need new id
+            //for all initial field values got the same id
             swarm.freeze();
             try {
                 id = swarm.newVersion();
                 res = new Model(swarm, getSpec().overrideToken(SpecQuant.ID, id));
-                Spec objSpec = spec.overrideToken(SpecQuant.ID, id);
-                res.init(fieldDescriptions, objSpec, value);
+                res.init(fieldDescriptions, value);
             } finally {
                 swarm.thaw();
             }
@@ -68,6 +68,10 @@ public class Type extends AbstractEventRelay<Model> {
 
         public SpecToken getName() {
             return name;
+        }
+
+        public String getNameAsStr() {
+            return name == null ? null : name.toString();
         }
 
         public SwarmValidator getValidator() {

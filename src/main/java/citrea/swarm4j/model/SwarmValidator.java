@@ -12,5 +12,5 @@ import org.json.JSONString;
  */
 public interface SwarmValidator {
 
-    public boolean validate(Spec spec, JSONString value, SwarmEventListener listener);
+    public boolean validate(Spec spec, JSONString value, EventRecipient listener);
 }

@@ -1,5 +1,6 @@
 package citrea.swarm4j.model;
 
+import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.spec.SpecQuant;
 import citrea.swarm4j.spec.SpecToken;
@@ -11,9 +12,7 @@ import citrea.swarm4j.spec.SpecToken;
  *         Date: 29/10/13
  *         Time: 01:13
  */
-public class Field extends AbstractEventRelay implements SwarmEventListener {
-    public static final String VERSION = "version";
-    public static final String VALUE = "value";
+public class Field extends AbstractEventRelay implements EventRecipient {
 
     private Type.FieldDescription description;
     private SpecToken version;
@@ -35,7 +34,7 @@ public class Field extends AbstractEventRelay implements SwarmEventListener {
     }
 
     @Override
-    protected void validate(Spec spec, JSONValue value, SwarmEventListener source) throws SwarmValidationException {
+    protected void validate(Spec spec, JSONValue value, EventRecipient source) throws SwarmValidationException {
         SwarmValidator validator = description.getValidator();
         if (validator != null) {
             if (!validator.validate(spec, value, source)) {
@@ -45,7 +44,17 @@ public class Field extends AbstractEventRelay implements SwarmEventListener {
     }
 
     @Override
-    public void set(Spec spec, JSONValue value, SwarmEventListener listener) throws SwarmException {
+    public void on(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
+        throw new SwarmUnsupportedActionException(action);
+    }
+
+    @Override
+    public void off(Action action, Spec spec, EventRecipient source) throws SwarmException {
+        throw new SwarmUnsupportedActionException(action);
+    }
+
+    @Override
+    public void set(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
 
         SpecToken version = spec.getVersion();
         if (version == null) {

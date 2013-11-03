@@ -1,10 +1,12 @@
 package citrea.swarm4j;
 
+import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.spec.SpecToken;
 import citrea.swarm4j.model.JSONValue;
 import citrea.swarm4j.model.Swarm;
 import citrea.swarm4j.model.SwarmException;
+import citrea.swarm4j.spec.SpecWithAction;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.java_websocket.WebSocket;
@@ -84,11 +86,13 @@ public class WSServerImpl extends WebSocketServer {
             JSONObject op = (JSONObject) operation;
             Iterator it = op.keys();
             while (it.hasNext()) {
-                final String specStr = String.valueOf(it.next());
-                final JSONValue value = new JSONValue(op.get(specStr));
-                final Spec spec = new Spec(specStr);
-                logger.debug("spec={} value={}", spec.toString(), value.toJSONString());
-                swarm.deliver(spec, value, ws);
+                final String specActionStr = String.valueOf(it.next());
+                final JSONValue value = new JSONValue(op.get(specActionStr));
+                final SpecWithAction specWithAction = new SpecWithAction(specActionStr);
+                final Action action = specWithAction.getAction();
+                final Spec spec = specWithAction.getSpec();
+                logger.debug("action={} spec={} value={}", action, spec, value.toJSONString());
+                swarm.deliver(action, spec, value, ws);
             }
         } catch (JSONException e) {
             //TODO send error

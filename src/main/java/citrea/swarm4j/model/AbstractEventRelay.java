@@ -1,5 +1,6 @@
 package citrea.swarm4j.model;
 
+import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.spec.SpecQuant;
 import citrea.swarm4j.spec.SpecToken;
@@ -19,7 +20,7 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
     private Spec spec;
     private SpecQuant childKey;
     private Map<SpecToken, CHILD> children = new HashMap<SpecToken, CHILD>();
-    private List<SwarmEventListener> listeners = new ArrayList<SwarmEventListener>();
+    private List<EventRecipient> listeners = new ArrayList<EventRecipient>();
 
     protected AbstractEventRelay(Swarm swarm, Spec spec, SpecQuant childKey) {
         this.swarm = swarm;
@@ -53,7 +54,7 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
         this.children.put(key, child);
     }
 
-    public void deliver(Spec spec, JSONValue value, SwarmEventListener source) throws SwarmException {
+    public void deliver(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
 
         checkACL(spec, value, source);
 
@@ -65,51 +66,50 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
         }
 
         if (child != null) {
-            child.deliver(spec, value, source);
+            child.deliver(action, spec, value, source);
         }
 
-        if (!(this instanceof SwarmEventListener)) { // can't accept set/on/off
+        if (!(this instanceof EventRecipient)) { // can't accept set/on/off
             throw new SwarmNoChildException(spec);
         }
 
-        final SpecToken member = spec.getMember();
-        if (SpecToken.on.equals(member) || SpecToken.reOn.equals(member)) {
+        EventRecipient me = (EventRecipient) this;
 
-            if (!(this instanceof SubscribeEventListener)) {
-                throw new SwarmNoChildException(spec);
-            }
+        switch (action) {
+            case on:
+            case reOn:
+                me.on(action, spec, value, source);
+                break;
 
-            ((SubscribeEventListener) this).on(spec, value, source);
+            case off:
+            case reOff:
+                me.off(action, spec, source);
+                break;
 
-        } else if (SpecToken.off.equals(member)) {
-
-            if (!(this instanceof SubscribeEventListener)) {
-                throw new SwarmNoChildException(spec);
-            }
-
-            ((SubscribeEventListener) this).off(spec, source);
-
-        } else {
-
-            ((SwarmEventListener) this).set(spec, value, source);
-
+            case set:
+            default:
+                me.set(spec, value, source);
         }
     }
 
-    protected void addListener(SwarmEventListener listener) {
+    protected void addListener(EventRecipient listener) {
         this.listeners.add(listener);
     }
 
-    protected void checkACL(Spec spec, JSONString value, SwarmEventListener listener) throws SwarmSecurityException {
+    public void removeListener(EventRecipient listener) {
+        this.listeners.remove(listener);
+    }
+
+    protected void checkACL(Spec spec, JSONString value, EventRecipient listener) throws SwarmSecurityException {
         //do nothing by default
     }
 
-    protected void validate(Spec spec, JSONValue value, SwarmEventListener source) throws SwarmValidationException {
+    protected void validate(Spec spec, JSONValue value, EventRecipient source) throws SwarmValidationException {
         //do nothing by default
     }
 
-    public void emit(Spec spec, JSONValue value, SwarmEventListener listener) throws SwarmException {
-        for (SwarmEventListener l : this.listeners) {
+    public void emit(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
+        for (EventRecipient l : this.listeners) {
             l.set(spec, value, listener);
         }
         //TODO add reactions / or don't ?
@@ -136,32 +136,42 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
         return children.keySet();
     }
 
-    protected static class OnceListenerWrapper implements SwarmEventListener {
-        private final SubscribeEventListener self;
+    protected static class OnceRecipientWrapper implements EventRecipient {
+        private final EventRecipient self;
         private final Spec initialSpec;
-        private final SwarmEventListener innerListener;
+        private final EventRecipient innerListener;
 
-        public OnceListenerWrapper(SubscribeEventListener self, Spec spec, SwarmEventListener listener) throws SwarmException {
+        public OnceRecipientWrapper(EventRecipient self, Spec spec, EventRecipient listener) throws SwarmException {
             this.self = self;
             this.initialSpec = spec;
             this.innerListener = listener;
         }
 
         @Override
-        public void set(Spec spec, JSONValue value, SwarmEventListener listener) throws SwarmException {
+        public void on(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
+            throw new SwarmUnsupportedActionException(action);
+        }
+
+        @Override
+        public void off(Action action, Spec spec, EventRecipient source) throws SwarmException {
+            throw new SwarmUnsupportedActionException(action);
+        }
+
+        @Override
+        public void set(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
             innerListener.set(spec, value, listener);
-            self.off(initialSpec, innerListener);
+            self.off(Action.off, initialSpec, innerListener);
         }
 
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
 
-            final SwarmEventListener oListener;
-            if (o instanceof AbstractEventRelay.OnceListenerWrapper) {
-                oListener = ((AbstractEventRelay.OnceListenerWrapper) o).innerListener;
-            } else if (o instanceof SwarmEventListener) {
-                oListener = ((SwarmEventListener) o);
+            final EventRecipient oListener;
+            if (o instanceof OnceRecipientWrapper) {
+                oListener = ((OnceRecipientWrapper) o).innerListener;
+            } else if (o instanceof EventRecipient) {
+                oListener = ((EventRecipient) o);
             } else {
                 return false;
             }

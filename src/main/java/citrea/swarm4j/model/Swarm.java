@@ -1,5 +1,6 @@
 package citrea.swarm4j.model;
 
+import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.spec.SpecQuant;
 import citrea.swarm4j.spec.SpecToken;
@@ -14,7 +15,7 @@ import java.util.*;
  *         Date: 29/10/13
  *         Time: 01:09
  */
-public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements SubscribeEventListener {
+public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements EventRecipient {
 
     private SpecToken frozen = null;
     private int freezes = 0;
@@ -29,22 +30,25 @@ public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements Sub
     }
 
     @Override
-    public void on(Spec spec, JSONValue value, SwarmEventListener source) throws SwarmException {
+    public void on(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
 
         if (getTypeId().equals(spec.getType())) { //handshake ?
 
-            if (source instanceof HandshakeListener) {
-                HandshakeListener hl = (HandshakeListener) source;
+            if (source instanceof HandshakeRecipient) {
+                HandshakeRecipient hl = (HandshakeRecipient) source;
                 hl.setPeerId(spec.getId());
                 hl.setClientTs(value.getValueAsStr());
             }
-            if (source instanceof SubscribeReplyListener) {
-                try {
-                    Spec reSpec = getSpec().overrideToken(SpecQuant.MEMBER, SpecToken.reOn);
-                    ((SubscribeReplyListener) source).reOn(reSpec, new JSONValue(getLastTs()));
-                } catch (JSONException e) {
-                    throw new SwarmException("json generation error in Swarm.on");
-                }
+
+            if (Action.reOn == action) {
+                return; //don't respond on 'reOn' action
+            }
+
+            try {
+                Spec reSpec = getSpec();
+                source.on(Action.reOn, reSpec, new JSONValue(getLastTs()), this);
+            } catch (JSONException e) {
+                throw new SwarmException("json generation error in Swarm.on");
             }
         } else {
             throw new SwarmNoChildException(spec);
@@ -52,14 +56,14 @@ public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements Sub
     }
 
     @Override
-    public void off(Spec spec, SwarmEventListener source) throws SwarmException {
+    public void off(Action action, Spec spec, EventRecipient source) throws SwarmException {
         if (!getTypeId().equals(spec.getType())) {
             throw new SwarmNoChildException(spec);
         }
     }
 
     @Override
-    public void set(Spec spec, JSONValue value, SwarmEventListener listener) throws SwarmException {
+    public void set(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
         throw new SwarmNoChildException(spec);
     }
 
@@ -72,6 +76,10 @@ public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements Sub
         addChild(type.getId(), type);
     }
 
+    protected Date generateNewDate() {
+        return new Date();
+    }
+
     public SpecToken newVersion() throws SwarmException {
         if (this.getId() == null || this.getId().getExt() == null) {
             //TODO correct exception
@@ -80,7 +88,7 @@ public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements Sub
         if (this.frozen != null) {
             return this.frozen;
         }
-        String ts = SpecToken.date2ts(new Date());
+        String ts = SpecToken.date2ts(generateNewDate());
         String seq;
         if (ts.equals(this.lastTs)) {
             seq = SpecToken.int2base(++this.seq, 2); // max ~4000Hz

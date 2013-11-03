@@ -20,10 +20,6 @@ public class SpecToken {
 
     public static final long EPOCH = 1262275200000L; // 1 Jan 2010 (milliseconds)
 
-    public static final SpecToken reOn = new SpecToken("reOn", NO_AUTHOR);
-    public static final SpecToken on = new SpecToken("on", NO_AUTHOR);
-    public static final SpecToken off = new SpecToken("off", NO_AUTHOR);
-
     // "versn+user~ext"
     private String str;
     private boolean parsed;

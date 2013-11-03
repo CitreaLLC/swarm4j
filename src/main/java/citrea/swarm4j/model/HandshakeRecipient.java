@@ -9,7 +9,7 @@ import citrea.swarm4j.spec.SpecToken;
  *         Date: 01/11/13
  *         Time: 16:57
  */
-public interface HandshakeListener extends SwarmEventListener {
+public interface HandshakeRecipient extends EventRecipient {
 
     void setPeerId(SpecToken peerId);
     void setClientTs(String clientTs);
