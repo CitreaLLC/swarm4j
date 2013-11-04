@@ -44,8 +44,11 @@ public class Type extends AbstractEventRelay<Model> implements EventRecipient {
             } finally {
                 swarm.thaw();
             }
+        } else {
+            res = new Model(swarm, getSpec().overrideToken(SpecQuant.ID, id));
+            res.init(fieldDescriptions, value);
         }
-        return new Model(swarm, getSpec().overrideToken(SpecQuant.ID, id));
+        return res;
     }
 
     @Override
