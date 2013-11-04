@@ -24,6 +24,7 @@ public class Field extends AbstractEventRelay implements EventRecipient {
     }
 
     public void init(SpecToken id, JSONValue value) throws SwarmException {
+        logger.trace("init version={} value={}", id, value);
         this.value = value;
         this.version = id;
     }

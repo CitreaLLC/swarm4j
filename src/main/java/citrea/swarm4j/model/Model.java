@@ -34,6 +34,7 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
 
     @Override
     public void on(Action action, Spec spec, JSONValue version, EventRecipient source) throws SwarmException {
+        logger.trace("on action={} spec={} value={}", action, spec, version);
 
         if (version != null && source != null) {
             //iterate all fields of this object
@@ -63,6 +64,7 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
 
     @Override
     public void off(Action action, Spec spec, EventRecipient source) throws SwarmException {
+        logger.trace("off action={} spec={}", action, spec);
         //remove source from this object listeners
         removeListener(source);
     }
@@ -73,6 +75,7 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
     }
 
     public void init(SpecToken id, Set<Type.FieldDescription> fieldDescriptions, JSONValue fieldValues) throws SwarmException {
+        logger.trace("init id={}", id);
         for (Type.FieldDescription descr: fieldDescriptions) {
             Spec fieldSpec = getSpec().overrideToken(SpecQuant.MEMBER, descr.getName());
             Field fld = new Field(swarm, fieldSpec, descr);

@@ -9,6 +9,9 @@ import org.java_websocket.WebSocket;
 import org.json.JSONException;
 import org.json.JSONString;
 import org.json.JSONStringer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  * Created with IntelliJ IDEA.
@@ -18,6 +21,7 @@ import org.json.JSONStringer;
  *         Time: 17:58
  */
 public class WSWrapper implements HandshakeRecipient {
+    private static final Logger logger = LoggerFactory.getLogger(WSWrapper.class);
 
     public static enum State {
         NEW, KNOW_PEER, HANDSHAKEN
@@ -36,9 +40,12 @@ public class WSWrapper implements HandshakeRecipient {
         this.ws = ws;
         this.pipeId = pipeId;
         this.state = State.NEW;
+        logger.info("state=NEW");
     }
 
     public void sendOperation(Action action, Spec spec, JSONString value) {
+        MDC.put("pipeId", this.pipeId);
+        logger.trace("sendOperation action={} spec={} value={}", action, spec, value);
         SpecWithAction key = new SpecWithAction(spec, action);
         JSONStringer payload = new JSONStringer();
         try {
@@ -50,6 +57,7 @@ public class WSWrapper implements HandshakeRecipient {
             throw new RuntimeException("error building json: " + e.getMessage(), e);
         }
         ws.send(payload.toString());
+        MDC.remove("pipeId");
     }
 
     public SpecToken getPeer() {
@@ -64,6 +72,7 @@ public class WSWrapper implements HandshakeRecipient {
     public void setPeerId(SpecToken peer) {
         this.peer = peer;
         this.state = State.KNOW_PEER;
+        logger.info("state=KNOWN_PEER");
     }
 
     public void markAsHandshaken() {

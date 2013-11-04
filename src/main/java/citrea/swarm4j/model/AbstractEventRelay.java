@@ -55,6 +55,7 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
     }
 
     protected void addChild(SpecToken key, CHILD child) {
+        logger.trace("addChild key={}", key);
         this.children.put(key, child);
     }
 
