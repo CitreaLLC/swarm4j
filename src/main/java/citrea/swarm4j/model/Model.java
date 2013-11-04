@@ -42,7 +42,8 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
                 SpecToken fldVersion = field.getVersion();
                 JSONValue maxKnownVersion = version.getFieldValue(fldVersion.getExt());
                 //if we have newer version of the field
-                if (fldVersion.getBare().compareTo(maxKnownVersion.getValueAsStr()) > 0) {
+                if (maxKnownVersion != null &&
+                        fldVersion.getBare().compareTo(maxKnownVersion.getValueAsStr()) > 0) {
                     //send new version of the field
                     source.set(field.getSpec().overrideToken(SpecQuant.VERSION, fldVersion), field.getValue(), this);
                 }
