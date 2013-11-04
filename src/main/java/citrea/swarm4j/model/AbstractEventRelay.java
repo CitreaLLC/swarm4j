@@ -70,6 +70,7 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
 
         if (child != null) {
             child.deliver(action, spec, value, source);
+            return;
         }
 
         if (!(this instanceof EventRecipient)) { // can't accept set/on/off
