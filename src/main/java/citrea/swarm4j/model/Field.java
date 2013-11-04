@@ -23,9 +23,9 @@ public class Field extends AbstractEventRelay implements EventRecipient {
         this.description = description;
     }
 
-    public void init(JSONValue value) throws SwarmException {
+    public void init(SpecToken id, JSONValue value) throws SwarmException {
         this.value = value;
-        this.version = swarm.newVersion();
+        this.version = id;
     }
 
     @Override
@@ -64,8 +64,6 @@ public class Field extends AbstractEventRelay implements EventRecipient {
 
         this.value = value;
         this.version = version;
-
-        this.emit(spec, value, listener);
     }
 
     public SpecToken getVersion() {

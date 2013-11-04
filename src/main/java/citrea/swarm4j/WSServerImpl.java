@@ -2,17 +2,16 @@ package citrea.swarm4j;
 
 import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
-import citrea.swarm4j.spec.SpecToken;
 import citrea.swarm4j.model.JSONValue;
 import citrea.swarm4j.model.Swarm;
 import citrea.swarm4j.model.SwarmException;
 import citrea.swarm4j.spec.SpecWithAction;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 import org.json.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -26,7 +25,7 @@ import java.util.*;
  *         Time: 01:05
  */
 public class WSServerImpl extends WebSocketServer {
-    public static final Logger logger = LogManager.getLogger(WSServerImpl.class);
+    public static final Logger logger = LoggerFactory.getLogger(WSServerImpl.class);
     private final Utils utils;
 
     private Swarm swarm;
@@ -41,13 +40,9 @@ public class WSServerImpl extends WebSocketServer {
     @Override
     public void onOpen( WebSocket conn, ClientHandshake handshake ) {
         final String wsId = utils.generateRandomId(6);
+        Thread.currentThread().setName("ws-" + wsId);
         knownPipes.put(conn, new WSWrapper(swarm, conn, wsId));
-        logger.info("connected entered the room!");
-        try {
-            sendToAll( "new connection: " + handshake.getResourceDescriptor() );
-        } catch (InterruptedException e) {
-            logger.warn("error sending to all err={}", e.getMessage(), e);
-        }
+        logger.info("pipeOpen");
     }
 
     @Override
@@ -57,11 +52,11 @@ public class WSServerImpl extends WebSocketServer {
             try {
                 ws.close();
             } catch (SwarmException e) {
-                logger.warn("error closing ws-wrapper err={}", e.getMessage(), e);
+                logger.warn("pipeClose err={}", e.getMessage(), e);
             }
         }
         knownPipes.remove(conn);
-        logger.info(ws + " has left the room!");
+        logger.info("pipeClose");
     }
 
     @Override
@@ -72,7 +67,7 @@ public class WSServerImpl extends WebSocketServer {
     @Override
     public void onMessage( WebSocket conn, String message ) {
         WSWrapper ws = knownPipes.get(conn);
-        logger.entry(message);
+        logger.debug("onMessage.start msg={}", message);
         JSONTokener jsonTokener = new JSONTokener(message);
         try {
             Object operation = jsonTokener.nextValue();
@@ -89,16 +84,15 @@ public class WSServerImpl extends WebSocketServer {
                 final SpecWithAction specWithAction = new SpecWithAction(specActionStr);
                 final Action action = specWithAction.getAction();
                 final Spec spec = specWithAction.getSpec();
-                logger.debug("action={} spec={} value={}", action, spec, value.toJSONString());
+                logger.debug("onMessage.parsed action={} spec={} value={}", action, spec, value.toJSONString());
                 swarm.deliver(action, spec, value, ws);
             }
         } catch (JSONException e) {
             //TODO send error
-            logger.warn("onMessage.parsing error", e);
+            logger.warn("onMessage parsing error", e);
         } catch (SwarmException e) {
             logger.warn("onMessage swarmException ", e);
         }
-        logger.exit();
     }
 
     /**

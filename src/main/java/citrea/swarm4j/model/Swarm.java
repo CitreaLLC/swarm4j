@@ -31,7 +31,7 @@ public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements Eve
 
     @Override
     public void on(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
-
+        logger.trace("on action={} spec={} value={}", action, spec, value);
         if (getTypeId().equals(spec.getType())) { //handshake ?
 
             if (source instanceof HandshakeRecipient) {
@@ -57,6 +57,7 @@ public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements Eve
 
     @Override
     public void off(Action action, Spec spec, EventRecipient source) throws SwarmException {
+        logger.trace("off action={} spec={}", action, spec);
         if (!getTypeId().equals(spec.getType())) {
             throw new SwarmNoChildException(spec);
         }
@@ -64,6 +65,7 @@ public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements Eve
 
     @Override
     public void set(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
+        logger.trace("set unsupported");
         throw new SwarmNoChildException(spec);
     }
 
@@ -97,7 +99,9 @@ public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements Eve
             seq = "";
         }
         this.lastTs = ts;
-        return new SpecToken(ts + seq, this.getId().getExt());
+        SpecToken res = new SpecToken(ts + seq, this.getId().getExt());
+        logger.trace("newVersion res={}", res);
+        return res;
     }
 
     public void freeze() throws SwarmException {

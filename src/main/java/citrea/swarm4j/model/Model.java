@@ -72,16 +72,19 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
         throw new SwarmNoChildException(spec);
     }
 
-    public void init(Set<Type.FieldDescription> fieldDescriptions, JSONValue fieldValues) throws SwarmException {
+    public void init(SpecToken id, Set<Type.FieldDescription> fieldDescriptions, JSONValue fieldValues) throws SwarmException {
         for (Type.FieldDescription descr: fieldDescriptions) {
             Spec fieldSpec = getSpec().overrideToken(SpecQuant.MEMBER, descr.getName());
             Field fld = new Field(swarm, fieldSpec, descr);
             addField(fld);
-            JSONValue fieldValue = fieldValues.getFieldValue(descr.getNameAsStr());
+            JSONValue fieldValue = null;
+            if (fieldValues != null) {
+                fieldValue = fieldValues.getFieldValue(descr.getNameAsStr());
+            }
             if (fieldValue == null) {
                 fieldValue = descr.getDefaultValue();
             }
-            fld.init(fieldValue);
+            fld.init(id, fieldValue);
         }
     }
 

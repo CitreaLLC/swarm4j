@@ -16,6 +16,11 @@ import java.util.*;
  *         Time: 16:03
  */
 public final class JSONValue implements JSONString {
+
+    private enum Type {
+        SIMPLE, OBJECT, ARRAY
+    }
+
     private Type type;
     private Map<String, JSONValue> map;
     private List<JSONValue> arr;
@@ -61,20 +66,6 @@ public final class JSONValue implements JSONString {
         }
     }
 
-    @Override
-    public String toJSONString() {
-        switch (type) {
-            case SIMPLE:
-                return json;
-            case OBJECT:
-                return new JSONObject(this.map).toString();
-            case ARRAY:
-                return new JSONObject(this.arr).toString();
-            default:
-                return null;
-        }
-    }
-
     public boolean isSimple() {
         return type == Type.SIMPLE;
     }
@@ -101,7 +92,21 @@ public final class JSONValue implements JSONString {
                 (this.type == Type.ARRAY && this.arr.isEmpty());
     }
 
-    private enum Type {
-        SIMPLE, OBJECT, ARRAY
+    @Override
+    public String toJSONString() {
+        switch (type) {
+            case SIMPLE:
+                return json;
+            case OBJECT:
+                return new JSONObject(this.map).toString();
+            case ARRAY:
+                return new JSONObject(this.arr).toString();
+            default:
+                return null;
+        }
+    }
+
+    public String toString() {
+        return toJSONString();
     }
 }

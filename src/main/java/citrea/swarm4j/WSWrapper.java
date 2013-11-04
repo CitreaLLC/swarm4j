@@ -56,6 +56,10 @@ public class WSWrapper implements HandshakeRecipient {
         return peer;
     }
 
+    public String getPipeId() {
+        return pipeId;
+    }
+
     @Override
     public void setPeerId(SpecToken peer) {
         this.peer = peer;

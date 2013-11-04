@@ -5,6 +5,8 @@ import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.spec.SpecQuant;
 import citrea.swarm4j.spec.SpecToken;
 import org.json.JSONString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -16,6 +18,8 @@ import java.util.*;
  *         Time: 00:50
  */
 public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
+    protected final Logger logger = LoggerFactory.getLogger(this.getClass());
+
     protected Swarm swarm;
     private Spec spec;
     private SpecQuant childKey;
@@ -55,6 +59,7 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
     }
 
     public void deliver(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
+        logger.trace("deliver action={} spec={} value={}", action, spec, value);
 
         checkACL(spec, value, source);
 
@@ -69,30 +74,36 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
         }
 
         if (child != null) {
+
             child.deliver(action, spec, value, source);
-            return;
+
+        } else {
+
+            if (!(this instanceof EventRecipient)) { // can't accept set/on/off
+                throw new SwarmNoChildException(spec);
+            }
+
+            EventRecipient me = (EventRecipient) this;
+
+            switch (action) {
+                case on:
+                case reOn:
+                    me.on(action, spec, value, source);
+                    break;
+
+                case off:
+                case reOff:
+                    me.off(action, spec, source);
+                    break;
+
+                case set:
+                default:
+                    me.set(spec, value, source);
+            }
         }
 
-        if (!(this instanceof EventRecipient)) { // can't accept set/on/off
-            throw new SwarmNoChildException(spec);
-        }
-
-        EventRecipient me = (EventRecipient) this;
-
-        switch (action) {
-            case on:
-            case reOn:
-                me.on(action, spec, value, source);
-                break;
-
-            case off:
-            case reOff:
-                me.off(action, spec, source);
-                break;
-
-            case set:
-            default:
-                me.set(spec, value, source);
+        if (action == Action.set) {
+            emit(spec, value, source);
         }
     }
 
@@ -104,7 +115,7 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
         this.listeners.remove(listener);
     }
 
-    protected void checkACL(Spec spec, JSONString value, EventRecipient listener) throws SwarmSecurityException {
+    protected void checkACL(Spec spec, JSONString value, EventRecipient source) throws SwarmSecurityException {
         //do nothing by default
     }
 
@@ -113,6 +124,7 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
     }
 
     public void emit(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
+        logger.trace("emit spec={} value={}", spec, value);
         for (EventRecipient l : this.listeners) {
             l.set(spec, value, listener);
         }
