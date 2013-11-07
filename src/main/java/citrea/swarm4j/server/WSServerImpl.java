@@ -1,9 +1,9 @@
-package citrea.swarm4j;
+package citrea.swarm4j.server;
 
+import citrea.swarm4j.Utils;
 import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.model.JSONValue;
-import citrea.swarm4j.model.Swarm;
 import citrea.swarm4j.model.SwarmException;
 import citrea.swarm4j.spec.SpecWithAction;
 import org.java_websocket.WebSocket;
@@ -78,20 +78,29 @@ public class WSServerImpl extends WebSocketServer {
 
             JSONObject op = (JSONObject) operation;
             Iterator it = op.keys();
-            while (it.hasNext()) {
-                final String specActionStr = String.valueOf(it.next());
-                final JSONValue value = new JSONValue(op.get(specActionStr));
-                final SpecWithAction specWithAction = new SpecWithAction(specActionStr);
-                final Action action = specWithAction.getAction();
-                final Spec spec = specWithAction.getSpec();
-                logger.debug("onMessage.parsed action={} spec={} value={}", action, spec, value.toJSONString());
-                swarm.deliver(action, spec, value, ws);
+
+            synchronized (swarm) {
+
+                while (it.hasNext()) {
+                    final String specActionStr = String.valueOf(it.next());
+                    final JSONValue value = new JSONValue(op.get(specActionStr));
+                    final SpecWithAction specWithAction = new SpecWithAction(specActionStr);
+                    final Action action = specWithAction.getAction();
+                    final Spec spec = specWithAction.getSpec();
+                    try {
+                        logger.debug("onMessage.parsed action={} spec={} value={}", action, spec, value.toJSONString());
+                        swarm.deliver(action, spec, value, ws);
+                    } catch (SwarmException e) {
+                        logger.warn("onMessage err={}", e.getMessage(), e);
+                        ws.sendOperation(Action.err, spec, new JSONValue(e.getMessage()));
+                    }
+                }
+
             }
+
         } catch (JSONException e) {
-            //TODO send error
-            logger.warn("onMessage parsing error", e);
-        } catch (SwarmException e) {
-            logger.warn("onMessage swarmException ", e);
+            //send error
+            ws.sendOperation(Action.err, swarm.getSpec(), new JSONValue("error parsing or generating JSON: " + e.getMessage()));
         }
     }
 

@@ -1,6 +1,7 @@
 package citrea.swarm4j.model;
 
 import citrea.swarm4j.spec.Spec;
+import citrea.swarm4j.spec.SpecQuant;
 
 /**
  * Created with IntelliJ IDEA.
@@ -11,14 +12,20 @@ import citrea.swarm4j.spec.Spec;
  */
 public class SwarmNoChildException extends SwarmException{
 
-    private Spec spec;
+    private final SpecQuant q;
+    private final Spec spec;
 
-    public SwarmNoChildException(Spec spec) {
-        super("destination not found: " + spec.toString());
+    public SwarmNoChildException(Spec spec, SpecQuant quant) {
+        super("destination '" + quant.name() + "' not found: " + spec.toString());
         this.spec = spec;
+        this.q = quant;
     }
 
     public Spec getSpec() {
         return spec;
+    }
+
+    public SpecQuant getQuant() {
+        return q;
     }
 }

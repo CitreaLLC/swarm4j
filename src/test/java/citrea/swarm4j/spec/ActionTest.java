@@ -16,6 +16,7 @@ public class ActionTest {
     public void testByName() throws Exception {
         assertEquals(Action.on, Action.byName("on"));
         assertEquals(Action.reOn, Action.byName("reOn"));
+        assertEquals(Action.once, Action.byName("once"));
         assertEquals(Action.off, Action.byName("off"));
         assertEquals(Action.reOff, Action.byName("reOff"));
         assertEquals(Action.set, Action.byName("set"));
@@ -26,6 +27,7 @@ public class ActionTest {
     public void testAsToken() throws Exception {
         assertEquals("*on", Action.on.asToken());
         assertEquals("*reOn", Action.reOn.asToken());
+        assertEquals("*once", Action.once.asToken());
         assertEquals("*off", Action.off.asToken());
         assertEquals("*reOff", Action.reOff.asToken());
         assertEquals("'*set' should be omitted", "", Action.set.asToken());

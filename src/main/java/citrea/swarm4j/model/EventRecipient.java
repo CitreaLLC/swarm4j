@@ -16,5 +16,5 @@ public interface EventRecipient extends EventListener {
 
     void on(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException;
     void off(Action action, Spec spec, EventRecipient source) throws SwarmException;
-    void set(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException;
+    void set(Spec spec, JSONValue value, EventRecipient source) throws SwarmException;
 }

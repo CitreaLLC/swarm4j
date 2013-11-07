@@ -1,5 +1,6 @@
 package citrea.swarm4j.model;
 
+import citrea.swarm4j.server.Swarm;
 import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.spec.SpecQuant;
@@ -19,8 +20,34 @@ import java.util.Set;
  */
 public class Model extends AbstractEventRelay<Field> implements EventRecipient {
 
+    private boolean ready;
+    private Map<EventRecipient, ActionSpecValueTriplet> source2on = new HashMap<EventRecipient, ActionSpecValueTriplet>();
+    private EventRecipient upstream;
+
     protected Model(Swarm swarm, Spec id) {
         super(swarm, id, SpecQuant.MEMBER);
+        this.ready = false;
+        this.upstream = null;
+    }
+
+    public void addField(Field field) {
+        addChild(field.getId(), field);
+    }
+
+    public EventRecipient getUpstream() {
+        return upstream;
+    }
+
+    public void setUpstream(EventRecipient upstream) throws SwarmException {
+        if (this.upstream == upstream) {
+            return;
+        } else if (this.upstream != null) {
+            this.upstream.off(Action.off, getSpec(), this);
+        }
+        this.upstream = upstream;
+        if (this.upstream != null) {
+            this.upstream.on(Action.on, getSpec(), getVersion(), this);
+        }
     }
 
     @Override
@@ -28,38 +55,43 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
         return null;
     }
 
-    public void addField(Field field) {
-        addChild(field.getId(), field);
+    @Override
+    protected void validate(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmValidationException {
+        logger.trace("validate action={} spec={} value={}", action, spec, value);
+        if (action == Action.set) {
+            if (!isListenersContains(source) && source != this.upstream) {
+                throw new SwarmValidationException(spec, "no subscription but *set received");
+            }
+        }
     }
 
     @Override
     public void on(Action action, Spec spec, JSONValue version, EventRecipient source) throws SwarmException {
         logger.trace("on action={} spec={} value={}", action, spec, version);
 
-        if (version != null && source != null) {
-            //iterate all fields of this object
-            for (SpecToken fieldId : getChildrenKeys()) {
-                final Field field = getChild(fieldId);
-                SpecToken fldVersion = field.getVersion();
-                JSONValue maxKnownVersion = version.getFieldValue(fldVersion.getExt());
-                //if we have newer version of the field
-                if (maxKnownVersion != null &&
-                        fldVersion.getBare().compareTo(maxKnownVersion.getValueAsStr()) > 0) {
-                    //send new version of the field
-                    source.set(field.getSpec().overrideToken(SpecQuant.VERSION, fldVersion), field.getValue(), this);
-                }
-            }
+        //only after loaded from store or synced from other server
+        if (!this.ready) {
+            //remember remote model replica version
+            source2on.put(source, new ActionSpecValueTriplet(action, spec, version));
+            //set upstream
+            setUpstream(swarm.getUpstream(spec));
+            return;
         }
 
         //add source as this object listener
         addListener(source);
 
-        if (Action.reOn == action) {
-            return; // don't respond on .reOn
+        if (version != null && source != null) {
+            JSONValue diff = getDiff(version);
+            if (!diff.isEmpty()) {
+                //send diff
+                source.set(getSpec(), diff, this);
+            }
         }
 
-        //send .reOn
-        source.on(Action.reOn, getSpec(), this.getVersion(), this);
+        if (Action.reOn != action) {
+            source.on(Action.reOn, getSpec(), this.getVersion(), this);
+        }
     }
 
     @Override
@@ -67,11 +99,45 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
         logger.trace("off action={} spec={}", action, spec);
         //remove source from this object listeners
         removeListener(source);
+
+        if (source == upstream) {
+            this.upstream = null;
+        }
+
+        if (action != Action.reOff) {
+            source.off(Action.reOff, spec, this);
+        }
+
+        //TODO check if the object can be garbage collected
     }
 
     @Override
     public void set(Spec spec, JSONValue diff, EventRecipient source) throws SwarmException {
-        throw new SwarmNoChildException(spec);
+        logger.trace("set spec={} value={}", spec, diff);
+
+        //apply diff
+        Spec objSpec = getSpec();
+        if (diff != null) {
+            for (String fieldSpecPostfix : diff.getFieldNames()) {
+                final JSONValue value = diff.getFieldValue(fieldSpecPostfix);
+                final Spec fieldSpec = new Spec(objSpec.toString() + fieldSpecPostfix);
+                Field field = getChild(fieldSpec);
+                field.set(fieldSpec, value, source);
+            }
+        }
+
+        if (!this.ready) {
+            this.ready = true;
+
+            for (Map.Entry<EventRecipient, ActionSpecValueTriplet> e: source2on.entrySet()) {
+                final EventRecipient peer = e.getKey();
+                final ActionSpecValueTriplet triplet = e.getValue();
+
+                this.on(triplet.getAction(), triplet.getSpec(), triplet.getValue(), peer);
+            }
+
+            source2on.clear();
+        }
     }
 
     public void init(SpecToken id, Set<Type.FieldDescription> fieldDescriptions, JSONValue fieldValues) throws SwarmException {
@@ -109,6 +175,27 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
         }
         try {
             return new JSONValue(versionVector);
+        } catch (JSONException e) {
+            throw new SwarmException("error building json for version: " + e.getMessage(), e);
+        }
+    }
+
+    public JSONValue getDiff(JSONValue version) throws SwarmException {
+        Map<String, JSONValue> res = new HashMap<String, JSONValue>();
+        //iterate all fields of this object
+        for (SpecToken fieldId : getChildrenKeys()) {
+            final Field field = getChild(fieldId);
+            SpecToken fldVersion = field.getVersion();
+            JSONValue maxKnownVersion = version.getFieldValue(fldVersion.getExt());
+            //if we have newer version of the field
+            if (maxKnownVersion != null &&
+                    fldVersion.getBare().compareTo(maxKnownVersion.getValueAsStr()) > 0) {
+                //send new version of the field
+                res.put(field.getId().withQuant(SpecQuant.ID) + fldVersion.withQuant(SpecQuant.VERSION), field.getValue());
+            }
+        }
+        try {
+            return new JSONValue(res);
         } catch (JSONException e) {
             throw new SwarmException("error building json for version: " + e.getMessage(), e);
         }

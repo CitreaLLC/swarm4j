@@ -1,8 +1,6 @@
-package citrea.swarm4j;
+package citrea.swarm4j.server;
 
-import citrea.swarm4j.model.Swarm;
-import citrea.swarm4j.spec.SpecToken;
-import org.java_websocket.WebSocketImpl;
+import citrea.swarm4j.Utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +10,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
-import java.util.Date;
 
 /**
  * Created with IntelliJ IDEA.

@@ -1,5 +1,6 @@
 package citrea.swarm4j.model;
 
+import citrea.swarm4j.server.Swarm;
 import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.spec.SpecQuant;
@@ -32,6 +33,7 @@ public class Type extends AbstractEventRelay<Model> implements EventRecipient {
 
     @Override
     protected Model createNewChild(Spec spec, JSONValue value) throws SwarmException {
+        logger.trace("createNewChild spec={} value={}", spec, value);
         SpecToken id = spec.getId();
         Model res;
         if (id == null) { //need new id
@@ -48,23 +50,22 @@ public class Type extends AbstractEventRelay<Model> implements EventRecipient {
             res = new Model(swarm, getSpec().overrideToken(SpecQuant.ID, id));
             res.init(id, fieldDescriptions, null);
         }
-        logger.trace("createNewChild res={}", res);
         return res;
     }
 
     @Override
     public void on(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
-
+        source.on(Action.reOn, spec, value, this);
     }
 
     @Override
     public void off(Action action, Spec spec, EventRecipient source) throws SwarmException {
-
+        source.off(Action.reOff, spec, this);
     }
 
     @Override
     public void set(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
-        throw new SwarmUnsupportedActionException(Action.set);
+        throw new SwarmNoChildException(spec, this.getChildKey());
     }
 
     public static class FieldDescription {

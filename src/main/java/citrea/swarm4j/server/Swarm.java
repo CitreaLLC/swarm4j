@@ -1,10 +1,11 @@
-package citrea.swarm4j.model;
+package citrea.swarm4j.server;
 
+import citrea.swarm4j.model.*;
 import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.spec.SpecQuant;
 import citrea.swarm4j.spec.SpecToken;
-import org.json.JSONException;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
 
@@ -22,6 +23,9 @@ public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements Eve
     private String lastTs = "";
     private int seq = 0;
 
+    @Autowired
+    private UpstreamFactory upstreamFactory;
+
     public Swarm(SpecToken typeId, SpecToken procId) {
         super(null, new Spec(typeId, procId), SpecQuant.TYPE);
         this.swarm = this;
@@ -30,43 +34,56 @@ public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements Eve
     }
 
     @Override
+    protected void validate(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmValidationException {
+        logger.trace("validate action={} spec={} value={}", spec, value);
+        if (source instanceof HandshakeAware) {
+            HandshakeAware ha = (HandshakeAware) source;
+            if (!ha.isHandshaken() && !getTypeId().equals(spec.getType())) {
+                throw new SwarmValidationException(spec, "not handshaken");
+            }
+        }
+    }
+
+    @Override
     public void on(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
         logger.trace("on action={} spec={} value={}", action, spec, value);
         if (getTypeId().equals(spec.getType())) { //handshake ?
 
-            if (source instanceof HandshakeRecipient) {
-                HandshakeRecipient hl = (HandshakeRecipient) source;
-                hl.setPeerId(spec.getId());
-                hl.setClientTs(value.getValueAsStr());
+            if (source instanceof HandshakeAware) {
+                HandshakeAware ha = (HandshakeAware) source;
+                ha.setPeerId(spec.getId());
+                ha.setClientTs(value.getValueAsStr());
+
+                upstreamFactory.onPeerConnected(ha);
             }
 
             if (Action.reOn == action) {
                 return; //don't respond on 'reOn' action
             }
 
-            try {
-                Spec reSpec = getSpec();
-                source.on(Action.reOn, reSpec, new JSONValue(getLastTs()), this);
-            } catch (JSONException e) {
-                throw new SwarmException("json generation error in Swarm.on");
-            }
+            Spec reSpec = getSpec();
+            source.on(Action.reOn, reSpec, new JSONValue(getLastTs()), this);
         } else {
-            throw new SwarmNoChildException(spec);
+            throw new SwarmNoChildException(spec, getChildKey());
         }
     }
 
     @Override
     public void off(Action action, Spec spec, EventRecipient source) throws SwarmException {
         logger.trace("off action={} spec={}", action, spec);
-        if (!getTypeId().equals(spec.getType())) {
-            throw new SwarmNoChildException(spec);
+        if (getTypeId().equals(spec.getType())) {
+
+            upstreamFactory.onPeerDisconnected(source);
+
+        } else {
+            throw new SwarmNoChildException(spec, getChildKey());
         }
     }
 
     @Override
     public void set(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
         logger.trace("set unsupported");
-        throw new SwarmNoChildException(spec);
+        throw new SwarmNoChildException(spec, getChildKey());
     }
 
     @Override
@@ -123,5 +140,9 @@ public class Swarm extends AbstractEventRelay<AbstractEventRelay> implements Eve
 
     public SpecToken getTypeId() {
         return getSpec().getType();
+    }
+
+    public EventRecipient getUpstream(Spec spec) {
+        return this.upstreamFactory.getUpstream(spec);
     }
 }

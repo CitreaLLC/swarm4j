@@ -12,7 +12,7 @@ import java.util.Date;
  *         Date: 27/10/13
  *         Time: 12:54
  */
-public class SpecToken {
+public class SpecToken implements Comparable<SpecToken> {
 
     public static final String RS_TOK = "[0-9A-Za-z_~]+";
     public static final String RS_TOK_EXT = "^(=)(?:\\+(=))?$".replaceAll("=", RS_TOK);
@@ -142,4 +142,12 @@ public class SpecToken {
         return (pos > -1 ? tokAsString.substring(pos + 1) : "");
     }
 
+    @Override
+    public int compareTo(SpecToken other) {
+        if (this.str == null) {
+            return other == null ? 0 : -1;
+        } else {
+            return other == null ? 1 : this.str.compareTo(other.str);
+        }
+    }
 }

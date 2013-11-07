@@ -1,4 +1,4 @@
-package citrea.swarm4j;
+package citrea.swarm4j.server;
 
 import citrea.swarm4j.model.*;
 import citrea.swarm4j.spec.Action;
@@ -20,32 +20,27 @@ import org.slf4j.MDC;
  *         Date: 31/10/13
  *         Time: 17:58
  */
-public class WSWrapper implements HandshakeRecipient {
+public class WSWrapper implements HandshakeAware {
     private static final Logger logger = LoggerFactory.getLogger(WSWrapper.class);
-
-    public static enum State {
-        NEW, KNOW_PEER, HANDSHAKEN
-    }
 
     private final Swarm swarm;
 
     private final WebSocket ws;
     private final String pipeId;
     private SpecToken peer;
-    private State state;
+    private boolean handshaken;
     private String clientTime;
 
     public WSWrapper(Swarm swarm, WebSocket ws, String pipeId) {
         this.swarm = swarm;
         this.ws = ws;
         this.pipeId = pipeId;
-        this.state = State.NEW;
-        logger.info("state=NEW");
+        this.handshaken = false;
     }
 
     public void sendOperation(Action action, Spec spec, JSONString value) {
         MDC.put("pipeId", this.pipeId);
-        logger.trace("sendOperation action={} spec={} value={}", action, spec, value);
+        logger.debug("sendOperation action={} spec={} value={}", action, spec, value);
         SpecWithAction key = new SpecWithAction(spec, action);
         JSONStringer payload = new JSONStringer();
         try {
@@ -60,32 +55,29 @@ public class WSWrapper implements HandshakeRecipient {
         MDC.remove("pipeId");
     }
 
-    public SpecToken getPeer() {
-        return peer;
-    }
-
     public String getPipeId() {
         return pipeId;
     }
 
     @Override
+    public SpecToken getPeerId() {
+        return peer;
+    }
+
+    @Override
     public void setPeerId(SpecToken peer) {
         this.peer = peer;
-        this.state = State.KNOW_PEER;
-        logger.info("state=KNOWN_PEER");
-    }
-
-    public void markAsHandshaken() {
-        this.state = State.HANDSHAKEN;
-    }
-
-    public State getState() {
-        return this.state;
+        this.handshaken = true;
     }
 
     @Override
     public void setClientTs(String clientTime) {
         this.clientTime = clientTime;
+    }
+
+    @Override
+    public boolean isHandshaken() {
+        return handshaken;
     }
 
     @Override
@@ -105,5 +97,20 @@ public class WSWrapper implements HandshakeRecipient {
 
     public void close() throws SwarmException {
         //TODO off all subscriptions
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        WSWrapper wsWrapper = (WSWrapper) o;
+
+        return ws.equals(wsWrapper.ws);
+    }
+
+    @Override
+    public int hashCode() {
+        return ws.hashCode();
     }
 }

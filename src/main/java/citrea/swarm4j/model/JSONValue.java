@@ -17,6 +17,8 @@ import java.util.*;
  */
 public final class JSONValue implements JSONString {
 
+    public static final JSONString NULL = new JSONValue((String) null);
+
     private enum Type {
         SIMPLE, OBJECT, ARRAY
     }
@@ -26,6 +28,12 @@ public final class JSONValue implements JSONString {
     private List<JSONValue> arr;
     private String json;
     private Object simpleValue;
+
+    public JSONValue(String string) {
+        this.type = Type.SIMPLE;
+        this.simpleValue = string;
+        this.json = string == null ? "null" : JSONObject.quote(string);
+    }
 
     public JSONValue(Map<String, Object> fieldValues) throws JSONException {
         this.type = Type.OBJECT;

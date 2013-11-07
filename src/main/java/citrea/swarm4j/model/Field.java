@@ -1,8 +1,8 @@
 package citrea.swarm4j.model;
 
+import citrea.swarm4j.server.Swarm;
 import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
-import citrea.swarm4j.spec.SpecQuant;
 import citrea.swarm4j.spec.SpecToken;
 
 /**
@@ -35,7 +35,7 @@ public class Field extends AbstractEventRelay implements EventRecipient {
     }
 
     @Override
-    protected void validate(Spec spec, JSONValue value, EventRecipient source) throws SwarmValidationException {
+    protected void validate(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmValidationException {
         SwarmValidator validator = description.getValidator();
         if (validator != null) {
             if (!validator.validate(spec, value, source)) {
@@ -55,16 +55,18 @@ public class Field extends AbstractEventRelay implements EventRecipient {
     }
 
     @Override
-    public void set(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
-
+    public void set(Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
         SpecToken version = spec.getVersion();
         if (version == null) {
             version = swarm.newVersion();
-            spec = spec.overrideToken(SpecQuant.VERSION, version);
+        } else if (this.version != null && version.compareTo(this.version) < 0) {
+            logger.trace("set skipped spec={} value={} version={}", spec, value, this.version);
+            return;
         }
 
         this.value = value;
         this.version = version;
+        logger.trace("set spec={} value={} version={}", spec, value, version);
     }
 
     public SpecToken getVersion() {

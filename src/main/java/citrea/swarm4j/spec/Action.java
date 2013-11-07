@@ -11,7 +11,7 @@ import java.util.Set;
  *         Time: 12:26
  */
 public enum Action {
-    on, reOn, off, reOff, set;
+    on, once, reOn, off, reOff, set, err;
 
     public static final String QUANT = "*";
 

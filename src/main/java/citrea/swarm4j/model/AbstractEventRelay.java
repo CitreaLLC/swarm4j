@@ -1,5 +1,6 @@
 package citrea.swarm4j.model;
 
+import citrea.swarm4j.server.Swarm;
 import citrea.swarm4j.spec.Action;
 import citrea.swarm4j.spec.Spec;
 import citrea.swarm4j.spec.SpecQuant;
@@ -46,6 +47,10 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
         return spec.getLastToken();
     }
 
+    public SpecQuant getChildKey() {
+        return this.childKey;
+    }
+
     public CHILD getChild(SpecToken key) {
         return (key == null) ? null : children.get(key);
     }
@@ -64,13 +69,15 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
 
         checkACL(spec, value, source);
 
-        validate(spec, value, source);
+        validate(action, spec, value, source);
 
         CHILD child = getChild(spec);
         if (child == null) {
-            child = createNewChild(spec, value);
-            if (child != null) {
-                addChild(child.getId(), child);
+            if (action == Action.on || action == Action.reOn) {
+                child = createNewChild(spec, value);
+                if (child != null) {
+                    addChild(child.getId(), child);
+                }
             }
         }
 
@@ -81,7 +88,7 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
         } else {
 
             if (!(this instanceof EventRecipient)) { // can't accept set/on/off
-                throw new SwarmNoChildException(spec);
+                throw new SwarmNoChildException(spec, getChildKey());
             }
 
             EventRecipient me = (EventRecipient) this;
@@ -92,9 +99,18 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
                     me.on(action, spec, value, source);
                     break;
 
+                case once:
+                    OnceRecipientWrapper wrappedSource = new OnceRecipientWrapper(me, spec, source);
+                    me.on(action, spec, value, wrappedSource);
+                    break;
+
                 case off:
                 case reOff:
                     me.off(action, spec, source);
+                    break;
+
+                case err:
+                    //ignore?
                     break;
 
                 case set:
@@ -116,18 +132,25 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
         this.listeners.remove(listener);
     }
 
+    public boolean isListenersContains(EventRecipient source) {
+        return this.listeners.contains(source);
+    }
+
     protected void checkACL(Spec spec, JSONString value, EventRecipient source) throws SwarmSecurityException {
         //do nothing by default
     }
 
-    protected void validate(Spec spec, JSONValue value, EventRecipient source) throws SwarmValidationException {
+    protected void validate(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmValidationException {
         //do nothing by default
     }
 
-    public void emit(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
+    public void emit(Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
         logger.trace("emit spec={} value={}", spec, value);
         for (EventRecipient l : this.listeners) {
-            l.set(spec, value, listener);
+            if (l.equals(source)) { //don't send back to source
+                continue;
+            }
+            l.set(spec, value, source);
         }
         //TODO add reactions / or don't ?
     }
@@ -166,7 +189,7 @@ public abstract class AbstractEventRelay<CHILD extends AbstractEventRelay> {
 
         @Override
         public void on(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
-            throw new SwarmUnsupportedActionException(action);
+            //ignore
         }
 
         @Override
