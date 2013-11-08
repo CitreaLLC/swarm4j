@@ -21,7 +21,7 @@ import java.util.Set;
 public class Model extends AbstractEventRelay<Field> implements EventRecipient {
 
     private boolean ready;
-    private Map<EventRecipient, ActionSpecValueTriplet> source2on = new HashMap<EventRecipient, ActionSpecValueTriplet>();
+    private Map<EventRecipient, ActionSpecValueTriplet> pendingOns = new HashMap<EventRecipient, ActionSpecValueTriplet>();
     private EventRecipient upstream;
 
     protected Model(Swarm swarm, Spec id) {
@@ -71,26 +71,39 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
 
         //only after loaded from store or synced from other server
         if (!this.ready) {
-            //remember remote model replica version
-            source2on.put(source, new ActionSpecValueTriplet(action, spec, version));
+            //add operation as pending
+            pendingOns.put(source, new ActionSpecValueTriplet(action, spec, version));
             //set upstream
             setUpstream(swarm.getUpstream(spec));
             return;
         }
 
-        //add source as this object listener
-        addListener(source);
+        if (Action.reOn == action && source == getUpstream()) { // *reOn received from upstream
 
-        if (version != null && source != null) {
-            JSONValue diff = getDiff(version);
-            if (!diff.isEmpty()) {
-                //send diff
-                source.set(getSpec(), diff, this);
+            //process all pending *on operations received from downstream peers
+            for (Map.Entry<EventRecipient, ActionSpecValueTriplet> e: pendingOns.entrySet()) {
+                final EventRecipient peer = e.getKey();
+                final ActionSpecValueTriplet triplet = e.getValue();
+
+                this.on(triplet.getAction(), triplet.getSpec(), triplet.getValue(), peer);
             }
-        }
+            pendingOns.clear();
 
-        if (Action.reOn != action) {
-            source.on(Action.reOn, getSpec(), this.getVersion(), this);
+        } else {
+            //add source as this object listener
+            addListener(source);
+
+            if (version != null && source != null) {
+                JSONValue diff = getDiff(version);
+                if (!diff.isEmpty()) {
+                    //send diff
+                    source.set(getSpec(), diff, this);
+                }
+            }
+
+            if (Action.reOn != action) {
+                source.on(Action.reOn, getSpec(), this.getVersion(), this);
+            }
         }
     }
 
@@ -128,15 +141,6 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
 
         if (!this.ready) {
             this.ready = true;
-
-            for (Map.Entry<EventRecipient, ActionSpecValueTriplet> e: source2on.entrySet()) {
-                final EventRecipient peer = e.getKey();
-                final ActionSpecValueTriplet triplet = e.getValue();
-
-                this.on(triplet.getAction(), triplet.getSpec(), triplet.getValue(), peer);
-            }
-
-            source2on.clear();
         }
     }
 
@@ -181,6 +185,7 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
     }
 
     public JSONValue getDiff(JSONValue version) throws SwarmException {
+        logger.trace("getDiff base={}", version);
         Map<String, JSONValue> res = new HashMap<String, JSONValue>();
         //iterate all fields of this object
         for (SpecToken fieldId : getChildrenKeys()) {
@@ -191,11 +196,13 @@ public class Model extends AbstractEventRelay<Field> implements EventRecipient {
             if (maxKnownVersion != null &&
                     fldVersion.getBare().compareTo(maxKnownVersion.getValueAsStr()) > 0) {
                 //send new version of the field
-                res.put(field.getId().withQuant(SpecQuant.ID) + fldVersion.withQuant(SpecQuant.VERSION), field.getValue());
+                res.put(field.getId().withQuant(SpecQuant.MEMBER) + fldVersion.withQuant(SpecQuant.VERSION), field.getValue());
             }
         }
         try {
-            return new JSONValue(res);
+            JSONValue diff = new JSONValue(res);
+            logger.trace("getDiff base={} result={}", version, diff);
+            return diff;
         } catch (JSONException e) {
             throw new SwarmException("error building json for version: " + e.getMessage(), e);
         }

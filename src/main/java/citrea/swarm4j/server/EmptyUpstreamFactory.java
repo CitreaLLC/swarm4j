@@ -43,6 +43,9 @@ public class EmptyUpstreamFactory implements UpstreamFactory {
             logger.trace("on action={} spec={} value={}", action, spec, value);
             //imitate object loaded
             source.set(spec, null, this);
+            if (action == Action.on) {
+                source.on(Action.reOn, spec, value, this);
+            }
         }
 
         @Override
