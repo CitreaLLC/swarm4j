@@ -49,12 +49,7 @@ public final class JSONValue implements JSONString {
         if (wrapped == null) {
             throw new JSONException("incorrect json");
         }
-        if (wrapped == JSONObject.NULL || wrapped == value) {
-            this.type = Type.SIMPLE;
-            this.simpleValue = value;
-            this.json = JSONObject.valueToString(value);
-        } else {
-            if (wrapped instanceof JSONObject) {
+        if (wrapped instanceof JSONObject) {
                 this.type = Type.OBJECT;
                 this.map = new HashMap<String, JSONValue>();
                 JSONObject jo = ((JSONObject) wrapped);
@@ -63,14 +58,17 @@ public final class JSONValue implements JSONString {
                     String key = String.valueOf(it.next());
                     this.map.put(key, new JSONValue(jo.get(key)));
                 }
-            } else if (wrapped instanceof JSONArray) {
-                this.type = Type.ARRAY;
-                this.arr = new ArrayList<JSONValue>();
-                JSONArray ja = ((JSONArray) wrapped);
-                for (int i = 0; i < ja.length(); i++) {
-                     this.arr.add(new JSONValue(ja.get(i)));
-                }
+        } else if (wrapped instanceof JSONArray) {
+            this.type = Type.ARRAY;
+            this.arr = new ArrayList<JSONValue>();
+            JSONArray ja = ((JSONArray) wrapped);
+            for (int i = 0; i < ja.length(); i++) {
+                 this.arr.add(new JSONValue(ja.get(i)));
             }
+        } else if (wrapped == value || wrapped == JSONObject.NULL) {
+            this.type = Type.SIMPLE;
+            this.simpleValue = value;
+            this.json = JSONObject.valueToString(value);
         }
     }
 
