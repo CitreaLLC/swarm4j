@@ -35,6 +35,12 @@ public final class JSONValue implements JSONString {
         this.json = string == null ? "null" : JSONObject.quote(string);
     }
 
+    public JSONValue(boolean value) {
+        this.type = Type.SIMPLE;
+        this.simpleValue = value;
+        this.json = value ? "true" : "false";
+    }
+
     public JSONValue(Map<String, Object> fieldValues) throws JSONException {
         this.type = Type.OBJECT;
         this.map = new HashMap<String, JSONValue>(fieldValues.size());
