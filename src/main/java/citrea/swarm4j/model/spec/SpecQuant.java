@@ -1,4 +1,4 @@
-package citrea.swarm4j.spec;
+package citrea.swarm4j.model.spec;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -16,8 +16,8 @@ import java.util.Map;
 public enum SpecQuant {
     TYPE('/'),
     ID('#'),
-    MEMBER('.'),
-    VERSION('!');
+    VERSION('!'),
+    OP('.');
 
     private static final Map<Character, SpecQuant> code2item;
     private static final SpecQuant[] allInOrder;
@@ -26,7 +26,7 @@ public enum SpecQuant {
     static {
         code2item = new HashMap<Character, SpecQuant>(4);
         code2item.put(TYPE.code, TYPE);
-        code2item.put(MEMBER.code, MEMBER);
+        code2item.put(OP.code, OP);
         code2item.put(ID.code, ID);
         code2item.put(VERSION.code, VERSION);
 
@@ -59,6 +59,11 @@ public enum SpecQuant {
 
     public SpecQuant next() {
         return next;
+    }
+
+    @Override
+    public String toString() {
+        return String.valueOf(code);
     }
 
     public static SpecQuant byCode(Character q) {

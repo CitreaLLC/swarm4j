@@ -1,4 +1,4 @@
-package citrea.swarm4j.spec;
+package citrea.swarm4j.model.spec;
 
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -36,13 +36,23 @@ public class SpecTokenTest {
     }
 
     @Test
+    public void testGetBody() throws Exception {
+        SpecToken tok = new SpecToken("/Type");
+        assertEquals("Type", tok.getBody());
+
+        //token with ext part
+        tok = new SpecToken("#bare+ext");
+        assertEquals("bare+ext", tok.getBody());
+    }
+
+    @Test
     public void testGetBare() throws Exception {
         //token w/o ext part
-        SpecToken tok = new SpecToken("simple");
+        SpecToken tok = new SpecToken("#simple");
         assertEquals("simple", tok.getBare());
 
         //token with ext part
-        tok = new SpecToken("bare+ext");
+        tok = new SpecToken("#bare+ext");
         assertEquals("bare", tok.getBare());
     }
 
@@ -59,41 +69,43 @@ public class SpecTokenTest {
 
     @Test
     public void testJoiningConstructor() throws Exception {
-        SpecToken tok = new SpecToken("bare1", "ext");
-        assertEquals("produce correct token", "bare1+ext", tok.toString());
+        SpecToken tok = new SpecToken(SpecQuant.VERSION, "bare1", "ext");
+        assertEquals("produce correct token", "!bare1+ext", tok.toString());
+        assertEquals("bare1+ext", tok.getBody());
         assertEquals("bare1", tok.getBare());
         assertEquals("ext", tok.getExt());
     }
 
     @Test
     public void testOverrideBare() throws Exception {
-        SpecToken tok = new SpecToken("bare1+ext");
+        SpecToken tok = new SpecToken("!bare1+ext");
         SpecToken tok2 = tok.overrideBare("bare2");
         assertNotSame("generates new SpecToken instance", tok, tok2);
-        assertEquals("do not modify the object", "bare1+ext", tok.toString());
+        assertEquals("do not modify the object", "!bare1+ext", tok.toString());
+        assertEquals("do not modify object body", "bare1+ext", tok.getBody());
         assertEquals("do not modify object bare", "bare1", tok.getBare());
         assertEquals("do not modify object ext", "ext", tok.getExt());
-        assertEquals("produce correct token", "bare2+ext", tok2.toString());
+        assertEquals("produce correct token", "!bare2+ext", tok2.toString());
     }
 
     @Test
     public void testOverrideExt() throws Exception {
-        SpecToken tok = new SpecToken("bare1+ext1");
+        SpecToken tok = new SpecToken("!bare1+ext1");
         SpecToken tok2 = tok.overrideExt("ext2");
         assertNotSame("generates new SpecToken instance", tok, tok2);
-        assertEquals("do not modify the object", "bare1+ext1", tok.toString());
+        assertEquals("do not modify the object", "!bare1+ext1", tok.toString());
         assertEquals("do not modify object bare", "bare1", tok.getBare());
         assertEquals("do not modify object ext", "ext1", tok.getExt());
-        assertEquals("produce correct token", "bare1+ext2", tok2.toString());
+        assertEquals("produce correct token", "!bare1+ext2", tok2.toString());
     }
 
     @Test
-    public void testWithQuant() throws Exception {
-        SpecToken tok = new SpecToken("bare+ext");
-        assertEquals("/bare+ext", tok.withQuant(SpecQuant.TYPE));
-        assertEquals("#bare+ext", tok.withQuant(SpecQuant.ID));
-        assertEquals(".bare+ext", tok.withQuant(SpecQuant.MEMBER));
-        assertEquals("!bare+ext", tok.withQuant(SpecQuant.VERSION));
+    public void testOverrideQuant() throws Exception {
+        SpecToken tok = new SpecToken("/bare+ext");
+        assertEquals("/bare+ext", tok.overrideQuant(SpecQuant.TYPE).toString());
+        assertEquals("#bare+ext", tok.overrideQuant(SpecQuant.ID).toString());
+        assertEquals("!bare+ext", tok.overrideQuant(SpecQuant.VERSION).toString());
+        assertEquals(".bare+ext", tok.overrideQuant(SpecQuant.OP).toString());
     }
 
     @Test

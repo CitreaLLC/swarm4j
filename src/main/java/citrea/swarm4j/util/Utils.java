@@ -1,4 +1,4 @@
-package citrea.swarm4j;
+package citrea.swarm4j.util;
 
 import org.apache.commons.codec.binary.Base64;
 import org.springframework.stereotype.Component;
