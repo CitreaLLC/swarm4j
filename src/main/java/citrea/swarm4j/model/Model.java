@@ -1,15 +1,15 @@
 package citrea.swarm4j.model;
 
-import citrea.swarm4j.server.Swarm;
-import citrea.swarm4j.spec.Action;
-import citrea.swarm4j.spec.Spec;
-import citrea.swarm4j.spec.SpecQuant;
-import citrea.swarm4j.spec.SpecToken;
-import org.json.JSONException;
+import citrea.swarm4j.model.callback.FieldChangeOpRecipient;
+import citrea.swarm4j.model.callback.OpFilterRecipient;
+import citrea.swarm4j.model.callback.OpRecipient;
+import citrea.swarm4j.model.annotation.SwarmOperation;
+import citrea.swarm4j.model.annotation.SwarmOperationKind;
+import citrea.swarm4j.model.meta.FieldMeta;
+import citrea.swarm4j.model.spec.*;
+import citrea.swarm4j.model.value.JSONValue;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -18,193 +18,207 @@ import java.util.Set;
  *         Date: 29/10/13
  *         Time: 01:01
  */
-public class Model extends AbstractEventRelay<Field> implements EventRecipient {
+public class Model extends Syncable {
 
-    private boolean ready;
-    private Map<EventRecipient, ActionSpecValueTriplet> pendingOns = new HashMap<EventRecipient, ActionSpecValueTriplet>();
-    private EventRecipient upstream;
+    public static final SpecToken SET = new SpecToken(".set");
 
-    protected Model(Swarm swarm, Spec id) {
-        super(swarm, id, SpecQuant.MEMBER);
-        this.ready = false;
-        this.upstream = null;
+    /**
+     * Model (LWW key-value object)
+     * @param id object id
+     * @param host swarm host object bound to
+     */
+    public Model(SpecToken id, Host host) throws SwarmException {
+        super(id, host);
     }
 
-    public void addField(Field field) {
-        addChild(field.getId(), field);
+    public Model(JSONValue initialState, Host host) throws SwarmException {
+        super(null, host);
+        this.set(initialState);
     }
 
-    public EventRecipient getUpstream() {
-        return upstream;
-    }
+    /**  init modes:
+     *    1  fresh id, fresh object
+     *    2  known id, stateless object
+     *    3  known id, state boot
+     */
 
-    public void setUpstream(EventRecipient upstream) throws SwarmException {
-        if (this.upstream == upstream) {
-            return;
-        } else if (this.upstream != null) {
-            this.upstream.off(Action.off, getSpec(), this);
-        }
-        this.upstream = upstream;
-        if (this.upstream != null) {
-            this.upstream.on(Action.on, getSpec(), getVersion(), this);
-        }
-    }
-
+    @SwarmOperation(kind = SwarmOperationKind.Neutral)
     @Override
-    protected Field createNewChild(Spec spec, JSONValue value) {
-        return null;
+    public void on(Spec spec, JSONValue base, OpRecipient source) throws SwarmException {
+        //  support the model.on('field',callback_fn) pattern
+        if (!base.isEmpty() && base.isSimple()) {
+            String possibleFieldName = base.getValueAsStr();
+            FieldMeta fieldMeta = getTypeMeta().getFieldMeta(possibleFieldName);
+            if (fieldMeta != null) {
+                //TODO check if field exists with a given name
+                base = JSONValue.NULL;
+                source = new OpFilterRecipient(new FieldChangeOpRecipient(source, possibleFieldName), SET);
+            }
+        }
+        // this will delay response if we have no state yet
+        super.on(spec, base, source);
     }
 
-    @Override
-    protected void validate(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmValidationException {
-        logger.trace("validate action={} spec={} value={}", action, spec, value);
-        if (action == Action.set) {
-            if (!isListenersContains(source) && source != this.upstream) {
-                throw new SwarmValidationException(spec, "no subscription but *set received");
-            }
-        }
+        /*init: function (spec,snapshot,host) {
+         if (this._version && this._version!=='0')
+         return; // FIXME tail FIXME
+         snapshot && this.apply(snapshot);
+         Syncable._pt.__init.apply(this,arguments);
+         }*/
+
+    // TODO remove unnecessary value duplication
+    protected void packState(JSONValue state) {
     }
 
-    @Override
-    public void on(Action action, Spec spec, JSONValue version, EventRecipient source) throws SwarmException {
-        logger.trace("on action={} spec={} value={}", action, spec, version);
-
-        //only after loaded from store or synced from other server
-        if (!this.ready) {
-            //add operation as pending
-            pendingOns.put(source, new ActionSpecValueTriplet(action, spec, version));
-            //set upstream
-            setUpstream(swarm.getUpstream(spec));
-            return;
-        }
-
-        if (Action.reOn == action && source == getUpstream()) { // *reOn received from upstream
-
-            //process all pending *on operations received from downstream peers
-            for (Map.Entry<EventRecipient, ActionSpecValueTriplet> e: pendingOns.entrySet()) {
-                final EventRecipient peer = e.getKey();
-                final ActionSpecValueTriplet triplet = e.getValue();
-
-                this.on(triplet.getAction(), triplet.getSpec(), triplet.getValue(), peer);
-            }
-            pendingOns.clear();
-
-        } else {
-            //add source as this object listener
-            addListener(source);
-
-            if (version != null && source != null) {
-                JSONValue diff = getDiff(version);
-                if (!diff.isEmpty()) {
-                    //send diff
-                    source.set(getSpec(), diff, this);
-                }
-            }
-
-            if (Action.reOn != action) {
-                source.on(Action.reOn, getSpec(), this.getVersion(), this);
-            }
-        }
-    }
-
-    @Override
-    public void off(Action action, Spec spec, EventRecipient source) throws SwarmException {
-        logger.trace("off action={} spec={}", action, spec);
-        //remove source from this object listeners
-        removeListener(source);
-
-        if (source == upstream) {
-            this.upstream = null;
-        }
-
-        if (action != Action.reOff) {
-            source.off(Action.reOff, spec, this);
-        }
-
-        //TODO check if the object can be garbage collected
-    }
-
-    @Override
-    public void set(Spec spec, JSONValue diff, EventRecipient source) throws SwarmException {
-        logger.trace("set spec={} value={}", spec, diff);
-
-        //apply diff
-        Spec objSpec = getSpec();
-        if (diff != null) {
-            for (String fieldSpecPostfix : diff.getFieldNames()) {
-                final JSONValue value = diff.getFieldValue(fieldSpecPostfix);
-                final Spec fieldSpec = new Spec(objSpec.toString() + fieldSpecPostfix);
-                Field field = getChild(fieldSpec);
-                field.set(fieldSpec, value, source);
-            }
-        }
-
-        if (!this.ready) {
-            this.ready = true;
-        }
-    }
-
-    public void init(SpecToken id, Set<Type.FieldDescription> fieldDescriptions, JSONValue fieldValues) throws SwarmException {
-        logger.trace("init id={}", id);
-        for (Type.FieldDescription descr: fieldDescriptions) {
-            Spec fieldSpec = getSpec().overrideToken(SpecQuant.MEMBER, descr.getName());
-            Field fld = new Field(swarm, fieldSpec, descr);
-            addField(fld);
-            JSONValue fieldValue = null;
-            if (fieldValues != null) {
-                fieldValue = fieldValues.getFieldValue(descr.getNameAsStr());
-            }
-            if (fieldValue == null) {
-                fieldValue = descr.getDefaultValue();
-            }
-            fld.init(id, fieldValue);
-        }
+    protected void unpackState(JSONValue state) {
     }
 
     /**
-     * @return current version vector: {"author~ssn": "lastKnownVersion",...}
-     * @throws SwarmException
+     * Removes redundant information from the log; as we carry a copy
+     * of the log in every replica we do everythin to obtain the minimal
+     * necessary subset of it.
+     * As a side effect, distillLog allows up to handle some partial
+     * order issues (see _ops.set).
+     * @see Model#set(citrea.swarm4j.model.spec.Spec, citrea.swarm4j.model.value.JSONValue)
+     * @return {*} distilled log {spec:true}
      */
-    public JSONValue getVersion() throws SwarmException {
-        Map<String, String> versionVector = new HashMap<String, String>();
-        for (SpecToken fieldId : getChildrenKeys()) {
-            final Field field = getChild(fieldId);
-            final SpecToken version = field.getVersion();
-            final String bare = version.getBare();
-            final String ext = version.getExt();
-            String currentMaxVersion = versionVector.get(ext);
-            if (currentMaxVersion == null || currentMaxVersion.compareTo(bare) <= 0) {
-                versionVector.put(ext, bare);
+    @Override
+    protected Map<String, JSONValue> distillLog() {
+        // explain
+        Map<String, JSONValue> cumul = new HashMap<String, JSONValue>();
+        Map<String, Boolean> heads = new HashMap<String, Boolean>();
+        List<Spec> sets = new ArrayList<Spec>(this.oplog.keySet());
+        Collections.sort(sets);
+        Collections.reverse(sets);
+        for (Spec spec : sets) {
+            JSONValue val = this.oplog.get(spec);
+            boolean notempty = false;
+            for (String field : val.getFieldNames()) {
+                if (cumul.containsKey(field)) {
+                    val.removeFieldValue(field);
+                } else {
+                    JSONValue fieldVal = val.getFieldValue(field);
+                    cumul.put(field, fieldVal);
+                    notempty = !fieldVal.isEmpty(); //store last value of the field
+                }
             }
+            String source = spec.getVersion().getExt();
+            if (!notempty) {
+                if (heads.containsKey(source)) {
+                    this.oplog.remove(spec);
+                }
+            }
+            heads.put(source, true);
         }
-        try {
-            return new JSONValue(versionVector);
-        } catch (JSONException e) {
-            throw new SwarmException("error building json for version: " + e.getMessage(), e);
+        return cumul;
+    }
+
+    /**
+     * This barebones Model class implements just one kind of an op:
+     * set({key:value}). To implment your own ops you need to understand
+     * implications of partial order as ops may be applied in slightly
+     * different orders at different replicas. This implementation
+     * may resort to distillLog() to linearize ops.
+     */
+    @SwarmOperation(kind = SwarmOperationKind.Logged)
+    public void set(Spec spec, JSONValue value) throws SwarmException {
+        Spec verOp = spec.getVersionOp();
+        String version = verOp.getVersion().toString();
+        if (this.version == null || this.version.compareTo(version) < 0) {
+            this.oplog.put(verOp, value);
+            this.distillLog(); // may amend the value
+            value = this.oplog.get(verOp);
+        }
+
+        if (value != null) {
+            this.apply(value);
         }
     }
 
-    public JSONValue getDiff(JSONValue version) throws SwarmException {
-        logger.trace("getDiff base={}", version);
-        Map<String, JSONValue> res = new HashMap<String, JSONValue>();
-        //iterate all fields of this object
-        for (SpecToken fieldId : getChildrenKeys()) {
-            final Field field = getChild(fieldId);
-            SpecToken fldVersion = field.getVersion();
-            JSONValue maxKnownVersion = version.getFieldValue(fldVersion.getExt());
-            //if we have newer version of the field
-            if (maxKnownVersion != null &&
-                    fldVersion.getBare().compareTo(maxKnownVersion.getValueAsStr()) > 0) {
-                //send new version of the field
-                res.put(field.getId().withQuant(SpecQuant.MEMBER) + fldVersion.withQuant(SpecQuant.VERSION), field.getValue());
+    // TODO should be generated
+    public void set(JSONValue newFieldValues) throws SwarmException {
+        Spec spec = this.newEventSpec(new SpecToken(".set"));
+        this.deliver(spec, newFieldValues, null);
+    }
+
+    public void fill(String key) throws SwarmException { // TODO goes to Model to support references
+        Spec spec = new Spec(this.getFieldValue(key).getValueAsStr()).getTypeId();
+        if (spec.getPattern() != SpecPattern.TYPE_ID) {
+            throw new SwarmException("incomplete spec");
+        }
+
+        this.setFieldValue(key, new JSONValue(new SyncableRef(this.host.get(spec))));
+    }
+
+    /**
+     * Generate .set operation after some of the model fields were changed
+     * TODO write test for Model.save()
+     */
+    public void save() throws SwarmException {
+        Map<String, JSONValue> cumul = this.distillLog();
+        Map<String, JSONValue> changes = new HashMap<String, JSONValue>();
+        JSONValue pojo = this.getPOJO(false);
+        for (String field : pojo.getFieldNames()) {
+            JSONValue currentFieldValue = this.getFieldValue(field);
+            if (!currentFieldValue.equals(cumul.get(field))) {
+                // TODO nesteds
+                changes.put(field, currentFieldValue);
             }
         }
-        try {
-            JSONValue diff = new JSONValue(res);
-            logger.trace("getDiff base={} result={}", version, diff);
-            return diff;
-        } catch (JSONException e) {
-            throw new SwarmException("error building json for version: " + e.getMessage(), e);
+        for (String field : cumul.keySet()) {
+            if (pojo.getFieldValue(field).isEmpty()) {
+                changes.put(field, JSONValue.NULL); // JSON has no undefined
+            }
         }
+
+        this.set(new JSONValue(changes));
     }
+
+    @Override
+    public String validate(Spec spec, JSONValue value) {
+        if (SET.equals(spec.getOp())) {
+            // no idea
+            return "";
+        }
+
+        Class<? extends Model> cls = this.getClass();
+        for (String key : value.getFieldNames()) {
+            //TODO fields: only @SwarmField annotated
+            try {
+                cls.getField(key);
+            } catch (NoSuchFieldException e) {
+                return "bad field name";
+            }
+        }
+        return "";
+    }
+
+    //TODO reactions
+    /*
+    // Model may have reactions for field changes as well as for 'real' ops/events
+    // (a field change is a .set operation accepting a {field:newValue} map)
+    public static void addReaction(String methodOrField, fn) {
+        var proto = this.prototype;
+        if (typeof (proto[methodOrField]) === 'function') { // it is a field name
+            return Syncable.addReaction.call(this, methodOrField, fn);
+        } else {
+            var wrapper = function (spec, val) {
+                if (methodOrField in val) {
+                    fn.apply(this, arguments);
+                }
+            };
+            wrapper._rwrap = true;
+            return Syncable.addReaction.call(this, 'set', wrapper);
+        }
+    }*/
+
+    public JSONValue getFieldValue(String fieldName) {
+        //TODO getFieldValue
+        return JSONValue.NULL;
+    }
+
+    public void setFieldValue(String fieldName, JSONValue value) {
+        //TODO setFieldValue
+    }
+
 }

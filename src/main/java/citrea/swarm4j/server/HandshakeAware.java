@@ -1,7 +1,8 @@
 package citrea.swarm4j.server;
 
-import citrea.swarm4j.model.EventRecipient;
-import citrea.swarm4j.spec.SpecToken;
+import citrea.swarm4j.model.callback.OpRecipient;
+import citrea.swarm4j.model.spec.Spec;
+import citrea.swarm4j.model.spec.SpecToken;
 
 /**
  * Created with IntelliJ IDEA.
@@ -10,9 +11,9 @@ import citrea.swarm4j.spec.SpecToken;
  *         Date: 01/11/13
  *         Time: 16:57
  */
-public interface HandshakeAware extends EventRecipient {
+public interface HandshakeAware extends OpRecipient {
 
-    SpecToken getPeerId();
+    Spec getPeerId();
     void setPeerId(SpecToken peerId);
     void setClientTs(String clientTs);
     boolean isHandshaken();

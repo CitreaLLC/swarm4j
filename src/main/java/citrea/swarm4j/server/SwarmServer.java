@@ -1,6 +1,7 @@
 package citrea.swarm4j.server;
 
-import citrea.swarm4j.Utils;
+import citrea.swarm4j.model.Host;
+import citrea.swarm4j.util.Utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,18 +29,14 @@ public class SwarmServer {
     private int port;
 
     private WSServerImpl wsServer;
-    private Swarm swarm;
+    private Host host;
 
     public SwarmServer() {
 
     }
 
-    public void setSwarm(Swarm swarm) {
-        this.swarm = swarm;
-    }
-
-    public void sendToAll( String text ) throws InterruptedException {
-        wsServer.sendToAll(text);
+    public void setHost(Host host) {
+        this.host = host;
     }
 
     public void stop() throws IOException, InterruptedException {
@@ -48,10 +45,10 @@ public class SwarmServer {
     }
 
     public void start() throws UnknownHostException {
-        if (swarm == null) {
-            throw new RuntimeException("'swarm' property not set");
+        if (host == null) {
+            throw new RuntimeException("'host' property not deliver");
         }
-        wsServer = new WSServerImpl(port, swarm, utils);
+        wsServer = new WSServerImpl(port, host, utils);
         wsServer.start();
         logger.info("started on port: " + port);
     }

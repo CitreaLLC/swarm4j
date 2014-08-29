@@ -1,7 +1,11 @@
 package citrea.swarm4j.model;
 
-import citrea.swarm4j.spec.Action;
-import citrea.swarm4j.spec.Spec;
+import citrea.swarm4j.model.callback.OpRecipient;
+import citrea.swarm4j.model.spec.Spec;
+import citrea.swarm4j.model.value.JSONValue;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created with IntelliJ IDEA.
@@ -10,36 +14,34 @@ import citrea.swarm4j.spec.Spec;
  *         Date: 03/11/13
  *         Time: 10:29
  */
-public class RememberingRecipient implements EventRecipient {
+public class RememberingRecipient implements OpRecipient {
 
-    public Triplet lastOnParams;
-    public Triplet lastOffParams;
-    public Triplet lastSetParams;
+    private List<Triplet> memory = new ArrayList<Triplet>();
 
     @Override
-    public void on(Action action, Spec spec, JSONValue value, EventRecipient source) throws SwarmException {
-        lastOnParams = new Triplet(spec, value, source);
+    public void deliver(Spec spec, JSONValue value, OpRecipient listener) throws SwarmException {
+        Triplet triplet = new Triplet(spec, value, listener);
+        memory.add(triplet);
     }
 
-    @Override
-    public void off(Action action, Spec spec, EventRecipient source) throws SwarmException {
-        lastOffParams = new Triplet(spec, null, source);
-    }
-
-    @Override
-    public void set(Spec spec, JSONValue value, EventRecipient listener) throws SwarmException {
-        lastSetParams = new Triplet(spec, value, listener);
+    public List<Triplet> getMemory() {
+        return memory;
     }
 
     public static class Triplet {
         public final Spec spec;
         public final JSONValue value;
-        public final EventRecipient listener;
+        public final OpRecipient source;
 
-        public Triplet(Spec spec, JSONValue value, EventRecipient listener) {
+        public Triplet(Spec spec, JSONValue value, OpRecipient source) {
             this.spec = spec;
             this.value = value;
-            this.listener = listener;
+            this.source = source;
         }
+    }
+
+    @Override
+    public String toString() {
+        return "RememberingRecipient{" + memory.size() + " operations remembered}";
     }
 }
