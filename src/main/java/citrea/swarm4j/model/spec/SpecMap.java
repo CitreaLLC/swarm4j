@@ -21,6 +21,10 @@ public class SpecMap {
         this.add(new Spec(vector));
     }
 
+    public SpecMap() {
+
+    }
+
     public void add(Spec versionVector) {
         Iterator<SpecToken> it = versionVector.getTokenIterator(SpecQuant.VERSION);
         while (it.hasNext()) {

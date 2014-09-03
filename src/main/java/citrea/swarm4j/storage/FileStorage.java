@@ -60,8 +60,8 @@ public class FileStorage extends Storage {
     private long pulling;
 
 
-    public FileStorage(String dir) throws SwarmException {
-        super();
+    public FileStorage(SpecToken id, String dir) throws SwarmException {
+        super(id);
         this.host = null; //will be set during Host creation
 
         this.dir = dir;
@@ -264,7 +264,7 @@ public class FileStorage extends Storage {
                     throw new JSONException("Waiting object, got " + (jsonObject == null ? "null" : jsonObject.getClass()));
                 }
 
-                state = new JSONValue(jsonObject);
+                state = JSONValue.convert(jsonObject);
                 Map<Spec, JSONValue> tail = this.tails.get(ti);
                 if (tail != null) {
                     JSONValue state_tail = state.getFieldValue("_tail");
@@ -352,7 +352,7 @@ public class FileStorage extends Storage {
 
                 JSONArray arr = (JSONArray) jsonObject;
                 for (int i = 0, l = arr.length(); i < l; i++) {
-                    JSONValue block = new JSONValue(arr.get(i));
+                    JSONValue block = JSONValue.convert(arr.get(i));
                     for (String tidoid : block.getFieldNames()) {
                         Map<Spec, JSONValue> tail = this.tails.get(new Spec(tidoid));
                         JSONValue ops = block.getFieldValue(tidoid);

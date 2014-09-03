@@ -137,8 +137,7 @@ public class Model extends Syncable {
 
     // TODO should be generated
     public void set(JSONValue newFieldValues) throws SwarmException {
-        Spec spec = this.newEventSpec(new SpecToken(".set"));
-        this.deliver(spec, newFieldValues, null);
+        this.deliver(this.newEventSpec(SET), newFieldValues, OpRecipient.NOOP);
     }
 
     public void fill(String key) throws SwarmException { // TODO goes to Model to support references
@@ -176,17 +175,14 @@ public class Model extends Syncable {
 
     @Override
     public String validate(Spec spec, JSONValue value) {
-        if (SET.equals(spec.getOp())) {
+        if (!SET.equals(spec.getOp())) {
             // no idea
             return "";
         }
 
-        Class<? extends Model> cls = this.getClass();
         for (String key : value.getFieldNames()) {
-            //TODO fields: only @SwarmField annotated
-            try {
-                cls.getField(key);
-            } catch (NoSuchFieldException e) {
+            FieldMeta fieldMeta = typeMeta.getFieldMeta(key);
+            if (fieldMeta == null) {
                 return "bad field name";
             }
         }

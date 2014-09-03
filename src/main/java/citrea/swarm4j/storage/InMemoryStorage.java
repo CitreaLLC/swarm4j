@@ -8,6 +8,7 @@ import citrea.swarm4j.model.spec.Spec;
 import citrea.swarm4j.model.spec.SpecQuant;
 import citrea.swarm4j.model.spec.SpecToken;
 import citrea.swarm4j.model.value.JSONValue;
+import com.sun.corba.se.impl.orbutil.concurrent.Sync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,9 +35,9 @@ import java.util.Map;
  *         Date: 26.08.2014
  *         Time: 00:33
  */
-public class InMemStorage extends Storage {
+public class InMemoryStorage extends Storage {
 
-    public static final Logger logger = LoggerFactory.getLogger(InMemStorage.class);
+    public static final Logger logger = LoggerFactory.getLogger(InMemoryStorage.class);
 
     // TODO async storage
     private Map<Spec, Map<Spec, JSONValue>> tails = new HashMap<Spec, Map<Spec, JSONValue>>();
@@ -44,8 +45,8 @@ public class InMemStorage extends Storage {
 
     protected Map<Spec, List<OpRecipient>> listeners;
 
-    public InMemStorage() {
-        this.id = new SpecToken(SpecQuant.ID, "dummy");
+    public InMemoryStorage(SpecToken id) {
+        super(id);
         // many implementations do not push changes
         // so there are no listeners
         this.listeners = null;
@@ -58,7 +59,7 @@ public class InMemStorage extends Storage {
             // First, it adds an op to the log tail unless the log is too long...
             // ...otherwise it sends back a subscription effectively requesting
             // the state, on state arrival zeroes the tail.
-            source.deliver(spec.overrideToken(Syncable.REON), new JSONValue(".init"), this);
+            source.deliver(spec.overrideToken(Syncable.REON), new JSONValue(Syncable.INIT.toString()), this);
         }
     }
 
@@ -74,7 +75,7 @@ public class InMemStorage extends Storage {
 
     @Override
     public Spec getTypeId() {
-        return new Spec(Host.HOST, this.id);
+        return new Spec(Host.HOST, this.getPeerId());
     }
 
     @Override

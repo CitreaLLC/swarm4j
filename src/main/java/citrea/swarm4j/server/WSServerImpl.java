@@ -1,8 +1,11 @@
 package citrea.swarm4j.server;
 
 import citrea.swarm4j.model.Host;
+import citrea.swarm4j.model.Syncable;
+import citrea.swarm4j.model.pipe.Pipe;
+import citrea.swarm4j.model.spec.SpecQuant;
+import citrea.swarm4j.model.spec.SpecToken;
 import citrea.swarm4j.util.Utils;
-import citrea.swarm4j.model.spec.Spec;
 import citrea.swarm4j.model.value.JSONValue;
 import citrea.swarm4j.model.SwarmException;
 import org.java_websocket.WebSocket;
@@ -40,7 +43,9 @@ public class WSServerImpl extends WebSocketServer {
     public void onOpen( WebSocket conn, ClientHandshake handshake ) {
         final String wsId = utils.generateRandomId(6);
         Thread.currentThread().setName("ws-" + wsId);
-        knownPipes.put(conn, new WSWrapper(conn, wsId, host));
+        WSWrapper stream = new WSWrapper(conn, wsId);
+        host.accept(stream);
+        knownPipes.put(conn, stream);
         logger.info("pipeOpen");
     }
 
@@ -48,11 +53,7 @@ public class WSServerImpl extends WebSocketServer {
     public void onClose( WebSocket conn, int code, String reason, boolean remote ) {
         WSWrapper ws = knownPipes.get(conn);
         if (ws != null) {
-            try {
-                ws.close();
-            } catch (SwarmException e) {
-                logger.warn("pipeClose err={}", e.getMessage(), e);
-            }
+            ws.close(); // TODO stream.close
         }
         knownPipes.remove(conn);
         logger.info("pipeClose");
@@ -60,35 +61,36 @@ public class WSServerImpl extends WebSocketServer {
 
     @Override
     public void onError( WebSocket conn, Exception ex ) {
-        logger.warn("onError error={}", ex.getMessage(), ex);
+        WSWrapper ws = knownPipes.get(conn);
+        if (ws != null) {
+            ws.close(); // TODO stream.close
+        }
+        knownPipes.remove(conn);
+        logger.warn("pipeError error={}", ex.getMessage(), ex);
     }
 
     @Override
     public void onMessage( WebSocket conn, String message ) {
         WSWrapper ws = knownPipes.get(conn);
-        JSONTokener jsonTokener = new JSONTokener(message);
+        if (ws == null) {
+            logger.warn("Unknown WebSocket: {}", conn.toString());
+            return;
+        }
         try {
-            logger.debug("onMessage.start msg={}", message);
-            Object bandleJSON = jsonTokener.nextValue();
-            if (!(bandleJSON instanceof JSONObject)) {
-                logger.warn("onMessage message must be a JSON");
-                return;
-            }
-
-            JSONObject bandle = (JSONObject) bandleJSON;
-            if (!ws.isHandshaken()) {
-                ws.parseHandshake(bandle);
-            } else {
-                ws.parseBundle(bandle);
-            }
-
-        } catch (JSONException e) {
+            ws.processMessage(message);
+        } catch (Exception e) {
             //send error
-            ws.sendOperation(host.getTypeId(), new JSONValue("error parsing or generating JSON: " + e.getMessage()));
-        } catch (SwarmException e) {
-            //send error
-            ws.sendOperation(host.getTypeId(), new JSONValue("Error: " + e.getMessage()));
-            logger.warn("onMessage error message={}", e.getMessage(), e);
+            try {
+                ws.sendMessage(
+                        Pipe.serialize(
+                                host.newEventSpec(Syncable.ERROR),
+                                new JSONValue("error parsing or generating JSON: " + e.getMessage())
+                        )
+                );
+            } catch (SwarmException e1) {
+                //ignore
+            }
+            logger.warn("onMessage error errMessage={}", e.getMessage(), e);
         }
     }
 }

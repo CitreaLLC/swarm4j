@@ -60,10 +60,8 @@ public class FieldWrapper implements FieldMeta {
     public JSONValue get(Syncable object) throws SwarmException {
         try {
             Object rawValue = field.get(object);
-            return rawValue == null ? JSONValue.NULL : new JSONValue(rawValue);
+            return JSONValue.convert(rawValue);
         } catch (IllegalAccessException e) {
-            throw new SwarmException(e.getMessage(), e);
-        } catch (JSONException e) {
             throw new SwarmException(e.getMessage(), e);
         }
     }

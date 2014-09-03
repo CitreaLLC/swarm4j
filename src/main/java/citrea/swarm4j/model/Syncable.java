@@ -22,14 +22,11 @@ import java.util.*;
  *         Date: 21.06.2014
  *         Time: 15:49
  */
-public abstract class Syncable implements Peer {
+public abstract class Syncable implements SomeSyncable, SubscriptionAware {
 
     public static final String RE_METHOD_NAME = "^[a-z][a-z0-9]*([A-Z][a-z0-9]*)*$";
+
     public static final SpecToken INIT = new SpecToken(".init");
-    public static final SpecToken ON = new SpecToken(".on");
-    public static final SpecToken REON = new SpecToken(".reon");
-    public static final SpecToken OFF = new SpecToken(".off");
-    public static final SpecToken REOFF = new SpecToken(".reoff");
     public static final SpecToken PATCH = new SpecToken(".patch");
     public static final SpecToken ERROR = new SpecToken(".error");
 
@@ -71,17 +68,14 @@ public abstract class Syncable implements Peer {
 
     protected void setHost(Host host) throws SwarmException {
         this.host = host;
-        this.ensureTypeIdSet();
-        this.checkUplink();
-    }
-
-    protected void ensureTypeIdSet() throws SwarmException {
         this.typeMeta = this.getTypeMeta();
         this.type = this.typeMeta.getTypeToken();
         if (this.id == null) {
             this.id = new SpecToken(SpecQuant.ID, this.host.time());
+            this.version = SpecToken.ZERO_VERSION.toString();
         }
         this.host.register(this);
+        this.checkUplink();
     }
 
     /**
@@ -94,23 +88,23 @@ public abstract class Syncable implements Peer {
 
         // sanity checks
         if (spec.getPattern() != SpecPattern.FULL) {
-            lstn.deliver(spec.overrideToken(".fail"), new JSONValue("malformed spec"), this.host);
+            lstn.deliver(spec.overrideToken(ERROR), new JSONValue("malformed spec"), OpRecipient.NOOP);
             return;
         }
 
         if (this.id == null) {
-            lstn.deliver(spec.overrideToken(".fail"), new JSONValue("undead object invoked"), this.host);
+            lstn.deliver(spec.overrideToken(ERROR), new JSONValue("undead object invoked"), OpRecipient.NOOP);
             return;
         }
 
         String error = this.validate(spec, value);
         if (error != null && !"".equals(error)) {
-            lstn.deliver(spec.overrideToken(".fail"), new JSONValue("invalid input, " + error), this.host);
+            lstn.deliver(spec.overrideToken(ERROR), new JSONValue("invalid input, " + error), OpRecipient.NOOP);
             return;
         }
 
         if (!this.acl(spec, value, lstn)) {
-            lstn.deliver(spec.overrideToken(".fail"), new JSONValue("access violation"), this.host);
+            lstn.deliver(spec.overrideToken(ERROR), new JSONValue("access violation"), OpRecipient.NOOP);
             return;
         }
 
@@ -174,6 +168,7 @@ public abstract class Syncable implements Peer {
         return new Spec(this.type, this.id);
     }
 
+    @Override
     public SpecToken getId() {
         return id;
     }
@@ -187,15 +182,6 @@ public abstract class Syncable implements Peer {
         return this.getTypeId()
                 .addToken(new SpecToken(SpecQuant.VERSION, this.host.time()))
                 .addToken(op);
-    }
-
-    /**
-     * Generates new specifier with unique version
-     * @param opName operation name
-     * @return full specifier
-     */
-    public Spec newEventSpec(String opName) {
-        return this.getTypeId().addToken("!" + this.host.time()).addToken(new SpecToken(opName));
     }
 
     /**
@@ -233,7 +219,7 @@ public abstract class Syncable implements Peer {
             }
             for (OpRecipient l : notify) { // screw it I want my 'this'
                 try {
-                    l.deliver(spec, value, this.host);
+                    l.deliver(spec, value, this);
                 } catch (Exception ex) {
                     //TODO log console.error(ex.message, ex.stack);
                 }
@@ -260,6 +246,10 @@ public abstract class Syncable implements Peer {
      */
     public void apply(JSONValue values) throws SwarmException {
         for (String fieldName : values.getFieldNames()) {
+            if (fieldName.startsWith("_")) {
+                //special field: _version, _tail, _vector, _oplog
+                continue;
+            }
             FieldMeta meta = this.typeMeta.getFieldMeta(fieldName);
             if (meta == null) {
                 logger.warn("Trying to modify unknown field: {}", fieldName);
@@ -277,7 +267,13 @@ public abstract class Syncable implements Peer {
     public SpecMap version() {
         // distillLog() may drop some operations; still, those need to be counted
         // in the version vector; so, their Lamport ids must be saved in this.vector
-        SpecMap map = new SpecMap(this.version + this.vector);
+        SpecMap map = new SpecMap();
+        if (this.version != null) {
+            map.add(this.version);
+        }
+        if (this.vector != null) {
+            map.add(this.vector);
+        }
         if (!this.oplog.isEmpty()) {
             for (Spec op : this.oplog.keySet()) {
                 map.add(op);
@@ -338,7 +334,7 @@ public abstract class Syncable implements Peer {
      * Check operation format/validity (recommendation: don't check against the current state)
      * @return '' if OK, error message otherwise.
      */
-    public String validate(Spec spec, JSONValue val) {
+    public String validate(Spec spec, JSONValue val) throws SwarmException {
         // TODO add causal stability violation check  Swarm.EPOCH  (+tests)
         return "";
     }
@@ -379,6 +375,7 @@ public abstract class Syncable implements Peer {
      *  @param filterValue !since.event
      *  @param source callback
      */
+    @Override
     @SwarmOperation(kind = SwarmOperationKind.Neutral)
     public void on(Spec spec, JSONValue filterValue, OpRecipient source) throws SwarmException {   // WELL  on() is not an op, right?
         // if no listener is supplied then the object is only
@@ -404,7 +401,7 @@ public abstract class Syncable implements Peer {
             if (filter_by_op != null) {
                 if (INIT.equals(filter_by_op)) {
                     JSONValue diff_if_needed = baseVersion != null ? this.diff(baseVersion) : JSONValue.NULL;
-                    source.deliver(spec.overrideToken(PATCH), diff_if_needed, this.host);
+                    source.deliver(spec.overrideToken(PATCH), diff_if_needed, this);
                     // use once()
                     return;
                 }
@@ -415,9 +412,9 @@ public abstract class Syncable implements Peer {
             if (baseVersion != null) {
                 JSONValue diff = this.diff(baseVersion);
                 if (!diff.isEmpty()) {
-                    source.deliver(spec.overrideToken(PATCH), diff, this.host); // 2downlink
+                    source.deliver(spec.overrideToken(PATCH), diff, this); // 2downlink
                 }
-                source.deliver(spec.overrideToken(REON), new JSONValue(this.version().toString()), this.host);
+                source.deliver(spec.overrideToken(REON), new JSONValue(this.version().toString()), this);
             }
         }
 
@@ -426,6 +423,7 @@ public abstract class Syncable implements Peer {
     }
 
     // should be generated?
+    @Override
     public void on(JSONValue evfilter, OpRecipient source) throws SwarmException {
         this.on(newEventSpec(ON), evfilter, source);
     }
@@ -433,6 +431,7 @@ public abstract class Syncable implements Peer {
     /**
      * downstream reciprocal subscription
      */
+    @Override
     @SwarmOperation(kind = SwarmOperationKind.Neutral)
     public void reon(Spec spec, JSONValue base, OpRecipient source) throws SwarmException {
         if (base.isEmpty()) return;
@@ -440,24 +439,27 @@ public abstract class Syncable implements Peer {
         JSONValue diff = this.diff(new SpecToken(base.getValueAsStr()));
         if (diff.isEmpty()) return;
 
-        source.deliver(spec.overrideToken(PATCH), diff, this.host); // 2uplink
+        source.deliver(spec.overrideToken(PATCH), diff, this); // 2uplink
     }
 
     /** Unsubscribe */
+    @Override
     @SwarmOperation(kind = SwarmOperationKind.Neutral)
     public void off(Spec spec, OpRecipient repl) throws SwarmException {
         this.removeListener(repl);
     }
 
     // should be generated?
+    @Override
     public void off(OpRecipient source) throws SwarmException {
         this.deliver(this.newEventSpec(OFF), JSONValue.NULL, source);
     }
 
     /** Reciprocal unsubscription */
+    @Override
     @SwarmOperation(kind = SwarmOperationKind.Neutral)
-    public void reoff(Spec spec, OpRecipient repl) throws SwarmException {
-        this.removeListener(repl);
+    public void reoff(Spec spec, OpRecipient source) throws SwarmException {
+        this.removeListener(source);
         if (this.id != null) this.checkUplink();
     }
 
@@ -555,7 +557,7 @@ public abstract class Syncable implements Peer {
      * Uplink connections may be closed or reestablished so we need
      * to adjust every object's subscriptions time to time.
      */
-    public void checkUplink() throws SwarmException {
+    protected void checkUplink() throws SwarmException {
         List<Uplink> new_uplinks = this.host.getSources(this.getTypeId());
         // the plan is to eliminate extra subscriptions and to
         // establish missing ones; that only affects outbound subs
@@ -569,7 +571,7 @@ public abstract class Syncable implements Peer {
             }
             int up_idx = new_uplinks.indexOf(up);
             if (up_idx == -1) { // don't need this uplink anymore
-                up.deliver(this.newEventSpec(OFF), JSONValue.NULL, this.host);
+                up.deliver(this.newEventSpec(OFF), JSONValue.NULL, this);
             } else {
                 new_uplinks.remove(up_idx);
             }
@@ -580,7 +582,7 @@ public abstract class Syncable implements Peer {
                 continue;
             }
             this.uplinks.add(0, new PendingUplink(new_uplink));
-            new_uplink.deliver(this.newEventSpec(ON), new JSONValue(this.version().toString()), this.host);
+            new_uplink.deliver(this.newEventSpec(ON), new JSONValue(this.version().toString()), this);
         }
     }
 
@@ -632,14 +634,15 @@ public abstract class Syncable implements Peer {
         while (itUplinks.hasNext()) {
             OpRecipient uplink = itUplinks.next();
             if (uplink instanceof Peer) {
-                uplink.deliver(this.newEventSpec(OFF), JSONValue.NULL, this.host);
+                uplink.deliver(this.newEventSpec(OFF), JSONValue.NULL, this);
             }
             itUplinks.remove();
         }
         // notify listeners of object closing
         Iterator<OpRecipient> itListeners = listeners.iterator();
         while (itListeners.hasNext()) {
-            itListeners.next().deliver(spec.addToken(REOFF), JSONValue.NULL, this.host);
+            // FIXME no version token in spec ???
+            itListeners.next().deliver(spec.addToken(REOFF), JSONValue.NULL, this);
             itListeners.remove();
         }
 
@@ -713,6 +716,11 @@ public abstract class Syncable implements Peer {
 
     public SpecToken getType() {
         return this.type;
+    }
+
+    @Override
+    public SpecToken getPeerId() {
+        return this.host == null ? null : this.host.getId();
     }
 
     protected class DeferredOpRecipient extends FilteringOpRecipient<OpRecipient> {

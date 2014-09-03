@@ -30,6 +30,33 @@ public final class JSONValue implements JSONString, Cloneable {
     private String json;
     private Object simpleValue;
 
+    private JSONValue(Type type, Map<String, JSONValue> map) {
+        if (type != Type.OBJECT) throw new IllegalArgumentException("Wrong type");
+        this.type = Type.OBJECT;
+        this.map = map;
+    }
+
+    private JSONValue(Type type, List<JSONValue> arr) {
+        if (type != Type.ARRAY) throw new IllegalArgumentException("Wrong type");
+        this.type = Type.ARRAY;
+        this.arr = arr;
+    }
+
+    private JSONValue(Type type, Object value) {
+        if (type != Type.SIMPLE && type != Type.REF) throw new IllegalArgumentException("Wrong type");
+        this.type = type;
+        this.simpleValue = value;
+        if (value instanceof SyncableRef) {
+            this.json = JSONObject.quote(value.toString());
+        } else {
+            try {
+                this.json = JSONObject.valueToString(value);
+            } catch (JSONException e) {
+                throw new IllegalArgumentException("Error converting the given value to json");
+            }
+        }
+    }
+
     public JSONValue(String string) {
         this.type = Type.SIMPLE;
         this.simpleValue = string;
@@ -88,35 +115,6 @@ public final class JSONValue implements JSONString, Cloneable {
         }
     }
 
-    public JSONValue(Object value) throws JSONException {
-        super();
-        Object wrapped = JSONObject.wrap(value);
-        if (wrapped == null) {
-            throw new JSONException("incorrect json");
-        }
-        if (wrapped instanceof JSONObject) {
-                this.type = Type.OBJECT;
-                this.map = new HashMap<String, JSONValue>();
-                JSONObject jo = ((JSONObject) wrapped);
-                Iterator it = jo.keys();
-                while (it.hasNext()) {
-                    String key = String.valueOf(it.next());
-                    this.map.put(key, new JSONValue(jo.get(key)));
-                }
-        } else if (wrapped instanceof JSONArray) {
-            this.type = Type.ARRAY;
-            this.arr = new ArrayList<JSONValue>();
-            JSONArray ja = ((JSONArray) wrapped);
-            for (int i = 0; i < ja.length(); i++) {
-                 this.arr.add(new JSONValue(ja.get(i)));
-            }
-        } else if (wrapped == value || wrapped == JSONObject.NULL) {
-            this.type = Type.SIMPLE;
-            this.simpleValue = value;
-            this.json = JSONObject.valueToString(value);
-        }
-    }
-
     public boolean isSimple() {
         return type == Type.SIMPLE;
     }
@@ -147,7 +145,7 @@ public final class JSONValue implements JSONString, Cloneable {
             if (value instanceof JSONValue) {
                 val = (JSONValue) value;
             } else {
-                val = new JSONValue(value);
+                val = JSONValue.convert(value);
             }
             this.map.put(fieldName, val);
         }
@@ -214,5 +212,50 @@ public final class JSONValue implements JSONString, Cloneable {
     @Override
     public JSONValue clone() {
         return new JSONValue(this);
+    }
+
+    public static JSONValue convert(Object value) {
+        if (value == null) {
+            return JSONValue.NULL;
+        } else if (value instanceof JSONValue) {
+            return (JSONValue) value;
+        } else if (value instanceof SyncableRef) {
+            return new JSONValue((SyncableRef) value);
+        } else {
+            Object wrapped = JSONObject.wrap(value);
+            if (wrapped == null) {
+                throw new IllegalArgumentException("incorrect json");
+            }
+            if (wrapped == JSONObject.NULL) {
+                return JSONValue.NULL;
+            }
+            final JSONValue res;
+            try {
+                if (wrapped instanceof JSONObject) {
+                    Map<String, JSONValue> map = new HashMap<String, JSONValue>();
+                    JSONObject jo = ((JSONObject) wrapped);
+                    Iterator it = jo.keys();
+                    while (it.hasNext()) {
+                        String key = String.valueOf(it.next());
+                        map.put(key, JSONValue.convert(jo.get(key)));
+                    }
+                    res = new JSONValue(Type.OBJECT, map);
+                } else if (wrapped instanceof JSONArray) {
+                    JSONArray warr = ((JSONArray) wrapped);
+                    List<JSONValue> arr = new ArrayList<JSONValue>();
+                    for (int i = 0; i < warr.length(); i++) {
+                        arr.add(JSONValue.convert(warr.get(i)));
+                    }
+                    res = new JSONValue(Type.ARRAY, arr);
+                } else if (wrapped == value) {
+                    res = new JSONValue(Type.SIMPLE, value);
+                } else {
+                    throw new IllegalArgumentException("Unknown value type");
+                }
+            } catch (JSONException e) {
+                throw new IllegalArgumentException("Error converting value to json: " + e.getMessage(), e);
+            }
+            return res;
+        }
     }
 }

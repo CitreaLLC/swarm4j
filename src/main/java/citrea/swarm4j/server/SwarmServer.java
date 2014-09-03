@@ -48,6 +48,7 @@ public class SwarmServer {
         if (host == null) {
             throw new RuntimeException("'host' property not deliver");
         }
+        host.start();
         wsServer = new WSServerImpl(port, host, utils);
         wsServer.start();
         logger.info("started on port: " + port);

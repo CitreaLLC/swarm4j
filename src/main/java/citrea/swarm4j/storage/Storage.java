@@ -1,6 +1,7 @@
 package citrea.swarm4j.storage;
 
 import citrea.swarm4j.model.Host;
+import citrea.swarm4j.model.QueuedOperation;
 import citrea.swarm4j.model.SwarmException;
 import citrea.swarm4j.model.Syncable;
 import citrea.swarm4j.model.callback.OpRecipient;
@@ -9,10 +10,14 @@ import citrea.swarm4j.model.spec.Spec;
 import citrea.swarm4j.model.spec.SpecMap;
 import citrea.swarm4j.model.spec.SpecToken;
 import citrea.swarm4j.model.value.JSONValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Created with IntelliJ IDEA.
@@ -21,7 +26,12 @@ import java.util.Map;
  *         Date: 25.08.2014
  *         Time: 00:55
  */
-public abstract class Storage implements Peer {
+public abstract class Storage implements Peer, Runnable {
+
+    protected Logger logger = LoggerFactory.getLogger(Storage.class);
+
+    public final BlockingQueue<QueuedOperation> queue = new LinkedBlockingQueue<QueuedOperation>();
+    private Thread queueThread;
 
     protected Host host;
     protected SpecToken id;
@@ -30,7 +40,13 @@ public abstract class Storage implements Peer {
     private String version;
     private long clockOffset = 0L;
 
+    protected Storage(SpecToken id) {
+        this.id = id;
+    }
+
     public void setHost(Host host) {
+        if (this.host != null) throw new IllegalStateException("host can be set only once");
+
         this.host = host;
     }
 
@@ -63,15 +79,25 @@ public abstract class Storage implements Peer {
 
     @Override
     public void deliver(Spec spec, JSONValue value, OpRecipient source) throws SwarmException {
-        final SpecToken op = spec.getOp();
-        if (Syncable.ON.equals(op)) {
-            this.on(spec, value, source);
-        } else if (Syncable.OFF.equals(op)) {
-            this.off(spec, source);
-        } else if (Syncable.PATCH.equals(op)) {
-            this.patch(spec, value);
+        if (queueThread != Thread.currentThread()) {
+            // queue
+            try {
+                queue.put(new QueuedOperation(spec, value, source));
+            } catch (InterruptedException e) {
+                throw new SwarmException(e.getMessage(), e);
+            }
         } else {
-            this.op(spec, value, source);
+            logger.debug("deliver ({}, {})", spec.toString(), value.toJSONString());
+            final SpecToken op = spec.getOp();
+            if (Syncable.ON.equals(op)) {
+                this.on(spec, value, source);
+            } else if (Syncable.OFF.equals(op)) {
+                this.off(spec, source);
+            } else if (Syncable.PATCH.equals(op)) {
+                this.patch(spec, value);
+            } else {
+                this.op(spec, value, source);
+            }
         }
     }
 
@@ -81,8 +107,6 @@ public abstract class Storage implements Peer {
 
     protected abstract void patch(Spec spec, JSONValue patch) throws SwarmException;
 
-    protected abstract void appendToLog(Spec ti, JSONValue verop2val) throws SwarmException;
-
     public void op(Spec spec, JSONValue val, OpRecipient source) throws SwarmException {
         Spec ti = spec.getTypeId();
         Spec vo = spec.getVersionOp();
@@ -90,6 +114,8 @@ public abstract class Storage implements Peer {
         o.put(vo.toString(), val);
         this.appendToLog(ti, new JSONValue(o));
     }
+
+    protected abstract void appendToLog(Spec ti, JSONValue verop2val) throws SwarmException;
 
     /**
      * Derive version vector from a state of a Syncable object.
@@ -117,5 +143,49 @@ public abstract class Storage implements Peer {
             str.append(spec);
         }
         return new SpecMap(str.toString()).toString();
+    }
+
+    @Override
+    public SpecToken getPeerId() {
+        return id;
+    }
+
+    @Override
+    public void setPeerId(SpecToken id) {
+        this.id = id;
+    }
+
+    public synchronized boolean ready() {
+        return queueThread != null;
+    }
+
+    @Override
+    public void run() {
+        synchronized (this) {
+            if (queueThread != null) {
+                throw new IllegalStateException("Can't run the single host more than once");
+            }
+            queueThread = Thread.currentThread();
+        }
+        queueThread.setName("Stor" + this.getPeerId().toString());
+
+        logger.info("started");
+        while (!queueThread.isInterrupted()) {
+            QueuedOperation op = queue.poll();
+            if (op == null) continue;
+
+            try {
+                this.deliver(op.getSpec(), op.getValue(), op.getPeer());
+            } catch (SwarmException e) {
+                //TODO fatal exception
+                logger.warn("Error processing operation: {}", op, e);
+            }
+        }
+
+        logger.info("finished");
+    }
+
+    public void start() {
+        new Thread(this).start();
     }
 }

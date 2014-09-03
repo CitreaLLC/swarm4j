@@ -65,6 +65,6 @@ public class Duck extends Model {
     // should be generated
     public void grow(int by) throws JSONException, SwarmException {
         Spec growSpec = this.newEventSpec(GROW);
-        this.deliver(growSpec, new JSONValue(by), this.host);
+        this.deliver(growSpec, new JSONValue(by), OpRecipient.NOOP);
     }
 }

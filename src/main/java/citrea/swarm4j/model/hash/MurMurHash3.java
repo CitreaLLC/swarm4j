@@ -1,4 +1,4 @@
-package citrea.swarm4j.model.spec;
+package citrea.swarm4j.model.hash;
 
 import java.nio.charset.Charset;
 
@@ -9,12 +9,13 @@ import java.nio.charset.Charset;
  *         Date: 22.06.2014
  *         Time: 00:02
  */
-public class MurMurHash3 {
+public class MurMurHash3 implements HashFunction {
     private static final Charset UTF8 = Charset.forName("UTF8");
     private MurMurHash3() {}
 
     /** Returns the MurmurHash3_x86_32 hash. */
-    public static int x86_32(String str) {
+    @Override
+    public int calc(String str) {
         byte[] data = str.getBytes(UTF8);
         int offset = 0;
         int len = data.length;
