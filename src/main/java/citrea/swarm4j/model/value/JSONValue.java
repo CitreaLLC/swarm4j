@@ -191,6 +191,19 @@ public final class JSONValue implements JSONString, Cloneable {
     }
 
     @Override
+    public boolean equals(Object obj) {
+        final JSONValue other;
+        if ((obj instanceof JSONValue)) {
+            other = (JSONValue) obj;
+        } else {
+            other = JSONValue.convert(obj);
+        }
+
+        //TODO optimize
+        return this.toJSONString().equals(other.toJSONString());
+    }
+
+    @Override
     public String toJSONString() {
         switch (type) {
             case SIMPLE:

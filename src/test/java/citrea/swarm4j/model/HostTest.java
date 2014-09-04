@@ -7,17 +7,12 @@ import citrea.swarm4j.model.spec.SpecToken;
 import citrea.swarm4j.model.value.JSONValue;
 import org.json.JSONException;
 import org.json.JSONTokener;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.FixMethodOrder;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.runners.MethodSorters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.Assert.*;
 
@@ -39,7 +34,7 @@ public class HostTest {
 
     @Before
     public void setUp() throws Exception {
-        storage = new XInMemoryStorage(new SpecToken("dummy"));
+        storage = new XInMemoryStorage(new SpecToken("#dummy"));
         storageThread = new Thread(storage);
         storageThread.start();
         host = new Host(new SpecToken("#gritzko"), storage);
@@ -209,18 +204,19 @@ public class HostTest {
         assertEquals(1, invocations.size());
     }
 
-    /* TODO custom field types
-    test('2.g custom field type',function (test) {
-        console.warn(QUnit.config.current.testName);
-        env.localhost= host;
-        var huey = host.get('/Duck#huey');
+    @Test
+    @Ignore
+    public void test2g_custom_field_type() throws Exception {
+        logger.info("2.g custom field type");
+        Duck huey = host.get(new Spec("/Duck#huey"));
+        /*TODO custom field types
         huey.set({height:'32cm'});
         ok(Math.abs(huey.height.meters-0.32)<0.0001);
         var vid = host.time();
         host.deliver(new Spec('/Duck#huey!'+vid+'.set'),{height:'35cm'});
         ok(Math.abs(huey.height.meters-0.35)<0.0001);
-    });
-    */
+        */
+    }
 
     @Test
     public void test2h_state_init() throws Exception {
@@ -245,29 +241,49 @@ public class HostTest {
         assertFalse(nameless.canDrink());
     }
 
-    /* TODO Sets
     @Test
     public void test2j_basic_Set_functions() throws Exception {
+        final JSONValue TRUE = JSONValue.convert(1);
+        final JSONValue FALSE = JSONValue.convert(0);
+        final Comparator<Duck> duckComparator = new Comparator<Duck>() {
+            @Override
+            public int compare(Duck duck, Duck duck2) {
+                return duck.age - duck2.age;
+            }
+        };
+
         logger.info("2.j basic Set functions (string index)");
-        var hueyClone = new Duck({age:2});
-        var deweyClone = new Duck({age:1});
-        var louieClone = new Duck({age:3});
-        var clones = new Nest();
+
+        Map<String, JSONValue> fieldValues = new HashMap<String, JSONValue>();
+        fieldValues.put("age", JSONValue.convert(2));
+        Duck hueyClone = new Duck(JSONValue.convert(fieldValues), host);
+        fieldValues.put("age", JSONValue.convert(1));
+        Duck deweyClone = new Duck(JSONValue.convert(fieldValues), host);
+        fieldValues.put("age", JSONValue.convert(3));
+        Duck louieClone = new Duck(JSONValue.convert(fieldValues), host);
+
+        Nest clones = new Nest(host);
+        Thread.sleep(20);
+
         clones.addObject(louieClone);
         clones.addObject(hueyClone);
         clones.addObject(deweyClone);
-        var sibs = clones.list(function(a,b){return a.age - b.age;});
-        strictEqual(sibs[0],deweyClone);
-        strictEqual(sibs[1],hueyClone);
-        strictEqual(sibs[2],louieClone);
-        var change = {};
-        change[hueyClone.spec()] = 0;
+
+        List<Duck> sibs = clones.list(duckComparator);
+        assertEquals(3, sibs.size());
+        assertSame(deweyClone, sibs.get(0));
+        assertSame(hueyClone, sibs.get(1));
+        assertSame(louieClone, sibs.get(2));
+
+        Map<String, JSONValue> change = new HashMap<String, JSONValue>();
+        change.put(hueyClone.getTypeId().toString(), FALSE);
         clones.change(change);
-        var sibs2 = clones.list(function(a,b){return a.age - b.age;});
-        equal(sibs2.length,2);
-        strictEqual(sibs2[0],deweyClone);
-        strictEqual(sibs2[1],louieClone);
-    });*/
+
+        List<Duck> sibs2 = clones.list(duckComparator);
+        assertEquals(2, sibs2.size());
+        assertSame(deweyClone, sibs2.get(0));
+        assertSame(louieClone, sibs2.get(1));
+    }
 
     @Test
     public void test2k_distilled_log() throws Exception {

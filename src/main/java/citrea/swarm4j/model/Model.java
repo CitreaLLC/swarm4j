@@ -29,10 +29,12 @@ public class Model extends Syncable {
      */
     public Model(SpecToken id, Host host) throws SwarmException {
         super(id, host);
+        this.logDistillator = new ModelLogDistillator();
     }
 
     public Model(JSONValue initialState, Host host) throws SwarmException {
         super(null, host);
+        this.logDistillator = new ModelLogDistillator();
         this.set(initialState);
     }
 
@@ -71,46 +73,6 @@ public class Model extends Syncable {
     }
 
     protected void unpackState(JSONValue state) {
-    }
-
-    /**
-     * Removes redundant information from the log; as we carry a copy
-     * of the log in every replica we do everythin to obtain the minimal
-     * necessary subset of it.
-     * As a side effect, distillLog allows up to handle some partial
-     * order issues (see _ops.set).
-     * @see Model#set(citrea.swarm4j.model.spec.Spec, citrea.swarm4j.model.value.JSONValue)
-     * @return {*} distilled log {spec:true}
-     */
-    @Override
-    protected Map<String, JSONValue> distillLog() {
-        // explain
-        Map<String, JSONValue> cumul = new HashMap<String, JSONValue>();
-        Map<String, Boolean> heads = new HashMap<String, Boolean>();
-        List<Spec> sets = new ArrayList<Spec>(this.oplog.keySet());
-        Collections.sort(sets);
-        Collections.reverse(sets);
-        for (Spec spec : sets) {
-            JSONValue val = this.oplog.get(spec);
-            boolean notempty = false;
-            for (String field : val.getFieldNames()) {
-                if (cumul.containsKey(field)) {
-                    val.removeFieldValue(field);
-                } else {
-                    JSONValue fieldVal = val.getFieldValue(field);
-                    cumul.put(field, fieldVal);
-                    notempty = !fieldVal.isEmpty(); //store last value of the field
-                }
-            }
-            String source = spec.getVersion().getExt();
-            if (!notempty) {
-                if (heads.containsKey(source)) {
-                    this.oplog.remove(spec);
-                }
-            }
-            heads.put(source, true);
-        }
-        return cumul;
     }
 
     /**

@@ -45,6 +45,7 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
     // (2) does it monotonically (in the alphanum order sense)
     protected List<Uplink> uplinks = new ArrayList<Uplink>();
     protected List<OpRecipient> listeners = new ArrayList<OpRecipient>();
+    protected LogDistillator logDistillator = new NoLogDistillator();
 
     protected Host host;
     protected TypeMeta typeMeta;
@@ -319,7 +320,7 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
     }
 
     protected Map<String, JSONValue> distillLog() {
-        return Collections.emptyMap();
+        return this.logDistillator.distillLog(this.oplog);
     }
 
     /**

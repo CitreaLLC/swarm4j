@@ -1,5 +1,7 @@
 package citrea.swarm4j.model.spec;
 
+import citrea.swarm4j.model.value.JSONValue;
+
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -164,6 +166,22 @@ public class Spec implements Comparable<Spec> {
             default:
                 return SpecPattern.UNKNOWN;
         }
+    }
+
+    public boolean fits(Spec specFilter) {
+        for (SpecToken tok : specFilter.tokens) {
+            boolean found = false;
+            for (SpecToken token : this.tokens) {
+                if (tok.equals(token)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
