@@ -170,18 +170,21 @@ public abstract class Storage implements Peer, Runnable {
         queueThread.setName("Stor" + this.getPeerId().toString());
 
         logger.info("started");
-        while (!queueThread.isInterrupted()) {
-            QueuedOperation op = queue.poll();
-            if (op == null) continue;
+        try {
+            while (!queueThread.isInterrupted()) {
+                QueuedOperation op = queue.take();
+                if (op == null) continue;
 
-            try {
-                this.deliver(op.getSpec(), op.getValue(), op.getPeer());
-            } catch (SwarmException e) {
-                //TODO fatal exception
-                logger.warn("Error processing operation: {}", op, e);
+                try {
+                    this.deliver(op.getSpec(), op.getValue(), op.getPeer());
+                } catch (SwarmException e) {
+                    //TODO fatal exception
+                    logger.warn("Error processing operation: {}", op, e);
+                }
             }
+        } catch (InterruptedException e) {
+            //ignore
         }
-
         logger.info("finished");
     }
 
