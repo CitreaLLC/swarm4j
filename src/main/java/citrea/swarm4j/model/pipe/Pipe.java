@@ -112,7 +112,7 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
     public void setPeerId(SpecToken id) {
         this.peerId = id;
         this.handshaken = true;
-        logger.info("pipe {} <=> {} handshaken", this.host.getId().toString(), this.peerId);
+        logger.info("{} handshaken", this.toString());
     }
 
     @Override
@@ -123,6 +123,13 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
     @Override
     public Spec getTypeId() {
         return handshaken ? new Spec(Host.HOST, peerId) : null;
+    }
+
+    @Override
+    public String toString() {
+        return "Pipe{ " + host.getId() +
+                " <=> " + (handshaken ? peerId : "?") +
+                " }";
     }
 
     //TODO configurable serializer

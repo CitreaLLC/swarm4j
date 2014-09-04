@@ -20,6 +20,11 @@ public interface OpRecipient extends EventListener {
         public void deliver(Spec spec, JSONValue value, OpRecipient source) throws SwarmException {
             //do nothing
         }
+
+        @Override
+        public String toString() {
+            return "NOOP";
+        }
     };
 
     void deliver(Spec spec, JSONValue value, OpRecipient source) throws SwarmException;

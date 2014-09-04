@@ -24,4 +24,6 @@ public interface TypeMeta {
 
     OperationMeta getOperationMeta(SpecToken op);
     OperationMeta getOperationMeta(String opName);
+
+    String getDescription();
 }

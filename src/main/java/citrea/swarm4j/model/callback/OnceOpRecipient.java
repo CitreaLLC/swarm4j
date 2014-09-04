@@ -31,4 +31,11 @@ public class OnceOpRecipient extends FilteringOpRecipient<OpRecipient> {
         super.deliverInternal(spec, value, source);
         obj.off(this);
     }
+
+    @Override
+    public String toString() {
+        return "OnceOpRecipient{" +
+                "objTypeId=" + obj.getTypeId() +
+                '}';
+    }
 }

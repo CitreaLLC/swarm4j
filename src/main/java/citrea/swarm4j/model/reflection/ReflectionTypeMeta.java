@@ -101,10 +101,11 @@ public class ReflectionTypeMeta implements TypeMeta {
         try {
             Constructor<? extends Syncable> constructor = type.getConstructor(SpecToken.class, Host.class);
             return constructor.newInstance(id, host);
+        } catch (InvocationTargetException e) {
+            Throwable ex = e.getTargetException();
+            throw new SwarmMethodInvocationException(ex.getMessage(), ex);
         } catch (NoSuchMethodException e) {
             throw new SwarmException("Suitable constructor not found: " + typeToken.toString() + id.toString(), e);
-        } catch (InvocationTargetException e) {
-            throw new SwarmMethodInvocationException(e.getMessage(), e);
         } catch (InstantiationException e) {
             throw new SwarmMethodInvocationException(e.getMessage(), e);
         } catch (IllegalAccessException e) {
@@ -125,6 +126,44 @@ public class ReflectionTypeMeta implements TypeMeta {
     @Override
     public OperationMeta getOperationMeta(String opName) {
         return operations.get(opName);
+    }
+
+    @Override
+    public String getDescription() {
+        StringBuilder res = new StringBuilder();
+
+        // "/Type{"
+        res.append(typeToken.toString());
+        res.append("{");
+
+        // operations=[op1,op2,...]
+        res.append("operations=[");
+        boolean first;
+        first = true;
+        for (String opName : operations.keySet()) {
+            if (!first) {
+                res.append(",");
+            } else {
+                first = false;
+            }
+            res.append(opName);
+        }
+        res.append("], ");
+
+        // fields=[field1,field2,...]}"
+        res.append("fields=[");
+        first = true;
+        for (String fieldName : fields.keySet()) {
+            if (!first) {
+                res.append(",");
+            } else {
+                first = false;
+            }
+            res.append(fieldName);
+        }
+        res.append("]}");
+
+        return res.toString();
     }
 
     @Override

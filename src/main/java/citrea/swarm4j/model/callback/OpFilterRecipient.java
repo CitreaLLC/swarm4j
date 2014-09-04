@@ -29,4 +29,11 @@ public class OpFilterRecipient extends FilteringOpRecipient<OpRecipient> {
         return op;
     }
 
+    @Override
+    public String toString() {
+        return "OpFilterRecipient{" +
+                "op=" + op +
+                ", inner=" + inner +
+                '}';
+    }
 }

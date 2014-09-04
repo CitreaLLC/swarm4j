@@ -23,4 +23,12 @@ public class FieldChangeOpRecipient extends FilteringOpRecipient<OpRecipient> {
     public boolean filter(Spec spec, JSONValue value, OpRecipient source) {
         return value.getFieldNames().contains(this.fieldName);
     }
+
+    @Override
+    public String toString() {
+        return "FieldChangeOpRecipient{" +
+                "fieldName='" + fieldName + "\', " +
+                "inner=" + inner +
+                '}';
+    }
 }

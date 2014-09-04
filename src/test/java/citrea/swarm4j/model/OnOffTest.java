@@ -27,88 +27,84 @@ import static org.junit.Assert.assertNotNull;
 public class OnOffTest {
 
     public static final Logger logger = LoggerFactory.getLogger(OnOffTest.class);
-    public static final SpecToken UPLINK = new SpecToken("#swarm~up");
-    public static final SpecToken DOWNLINK = new SpecToken("#client");
+    public static final SpecToken SERVER = new SpecToken("#swarm~up");
+    public static final SpecToken CLIENT = new SpecToken("#client");
 
-    private Thread uplinkStorageThread;
-    private Thread uplinkThread;
+    private Thread dummyStorageThread;
+    private Thread serverThread;
     private Thread downlinkThread;
-    private Thread downlinkStorageThread;
+    //TODO cache-storage private Thread cacheStorageThread;
 
-    private XInMemoryStorage uplinkStorage;
-    private XInMemoryStorage downlinkStorage;
+    private XInMemoryStorage dummyStorage;
+    //TODO cache-storage private XInMemoryStorage cacheStorage;
 
-    private Host uplink;
-    private Host downlink;
+    private Host server;
+    private Host client;
 
     private LoopbackConnection up_down_link;
 
     @Before
     public void setUp() throws Exception {
 
-        uplinkStorage = new XInMemoryStorage(new SpecToken("#dummy"));
-        uplinkStorageThread = new Thread(uplinkStorage);
-        uplinkStorageThread.start();
+        dummyStorage = new XInMemoryStorage(new SpecToken("#dummy"));
+        dummyStorageThread = new Thread(dummyStorage);
+        dummyStorageThread.start();
 
-        uplink = new Host(UPLINK, uplinkStorage);
-        uplink.registerType(Duck.class);
-        uplink.registerType(Thermometer.class);
-        uplinkThread = new Thread(uplink);
-        uplinkThread.start();
-        while (!uplink.ready()) {
+        server = new Host(SERVER, dummyStorage);
+        server.registerType(Duck.class);
+        server.registerType(Thermometer.class);
+        serverThread = new Thread(server);
+        serverThread.start();
+        while (!server.ready()) {
             Thread.sleep(10);
         }
 
 
-        downlinkStorage = new XInMemoryStorage(new SpecToken("#cache"));
-        downlinkStorageThread = new Thread(downlinkStorage);
-        downlinkStorageThread.start();
+        //cacheStorage = new XInMemoryStorage(new SpecToken("#cache"));
+        //cacheStorageThread = new Thread(cacheStorage);
+        //cacheStorageThread.start();
 
-        downlink = new Host(DOWNLINK, downlinkStorage);
-        downlink.registerType(Duck.class);
-        downlink.registerType(Thermometer.class);
-        downlinkThread = new Thread(downlink);
+        client = new Host(CLIENT);
+        client.registerType(Duck.class);
+        client.registerType(Thermometer.class);
+        downlinkThread = new Thread(client);
         downlinkThread.start();
-        while (!downlink.ready()) {
+        while (!client.ready()) {
             Thread.sleep(10);
         }
 
         up_down_link = new LoopbackConnection();
-        uplink.accept(up_down_link);
-        downlink.connect(up_down_link.getPaired());
+        server.accept(up_down_link);
+        client.connect(up_down_link.getPaired());
     }
 
     @After
     public void tearDown() throws Exception {
-        downlink.close();
-        downlink = null;
+        client.close();
+        client = null;
         downlinkThread.interrupt();
         downlinkThread = null;
 
-        uplink.close();
-        uplink = null;
-        uplinkThread.interrupt();
-        uplinkThread = null;
+        server.close();
+        server = null;
+        serverThread.interrupt();
+        serverThread = null;
 
-        uplinkStorage = null;
-        uplinkStorageThread.interrupt();
-        uplinkStorageThread = null;
-
-        downlinkStorage = null;
-        downlinkStorageThread.interrupt();
-        downlinkStorageThread = null;
+        dummyStorage = null;
+        dummyStorageThread.interrupt();
+        dummyStorageThread = null;
     }
 
     @Test
     public void test3a_serialized_on_reon() throws SwarmException, InterruptedException {
         logger.info("3.a serialized on, reon");
-        // that's the default uplink.getSources = function () {return [storage]};
+        // that's the default server.getSources = function () {return [storage]};
         final Spec THERM_ID = new Spec("/Thermometer#room");
 
-        downlink.on(new JSONValue(THERM_ID.addToken(Syncable.INIT).toString()), new OpRecipient() {
+        client.on(new JSONValue(THERM_ID.addToken(Syncable.INIT).toString()), new OpRecipient() {
             @Override
             public void deliver(Spec spec, JSONValue value, OpRecipient source) throws SwarmException {
-                Thermometer obj = (Thermometer) downlink.objects.get(THERM_ID);
+                Thermometer obj = (Thermometer) client.objects.get(THERM_ID);
                 JSONValue fieldValues = new JSONValue(new HashMap<String, JSONValue>());
                 try {
                     fieldValues.setFieldValue("t", 22);
@@ -120,7 +116,7 @@ public class OnOffTest {
         });
         Thread.sleep(100);
 
-        Thermometer o = (Thermometer) uplink.objects.get(THERM_ID);
+        Thermometer o = (Thermometer) server.objects.get(THERM_ID);
         assertNotNull(o);
         assertEquals(22, o.t);
     }
@@ -129,13 +125,13 @@ public class OnOffTest {
     @Ignore
     public void test3b_pipe_reconnect_backoff() throws SwarmException, InterruptedException {
         logger.info("3.b pipe reconnect, backoff");
-        Thermometer thermometer = uplink.get(Thermometer.class);
+        Thermometer thermometer = server.get(Thermometer.class);
 
         // OK. The idea is to connect/disconnect it 100 times then
         // check that the state is OK, there are no zombie listeners
         // no objects/hosts, log is 1 record long (distilled) etc
 
-        downlink.on(JSONValue.convert(thermometer.getTypeId().addToken(Model.SET).toString()), new OpRecipient() {
+        client.on(JSONValue.convert(thermometer.getTypeId().addToken(Model.SET).toString()), new OpRecipient() {
             @Override
             public void deliver(Spec spec, JSONValue value, OpRecipient source) throws SwarmException {
                 if (Model.SET.equals(spec.getOp())) {
@@ -174,9 +170,9 @@ public class OnOffTest {
         });
 
         downlink1.on('.reon', function (spec,val,src) {
-            equal(spec.id(), 'downlink~C1');
+            equal(spec.id(), 'client~C1');
             setTimeout(function(){ //:)
-                downlink1.disconnect('uplink~C');
+                downlink1.disconnect('server~C');
             }, 100);
         });
         */

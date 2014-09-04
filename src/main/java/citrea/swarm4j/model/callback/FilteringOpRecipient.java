@@ -51,4 +51,12 @@ public abstract class FilteringOpRecipient<T extends OpRecipient> implements OpR
     public int hashCode() {
         return inner.hashCode();
     }
+
+    @Override
+    public String toString() {
+        return getClass().getSimpleName() +
+                "{" +
+                "inner=" + inner +
+                '}';
+    }
 }

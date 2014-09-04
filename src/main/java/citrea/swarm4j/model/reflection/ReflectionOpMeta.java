@@ -61,10 +61,10 @@ public class ReflectionOpMeta implements OperationMeta {
                     throw new SwarmMethodInvocationException("Unsupported method signature: " + this.signature);
             }
         } catch (IllegalAccessException e) {
-            throw new SwarmMethodInvocationException("Method invocation error: " + e.getMessage(), e);
+            throw new SwarmMethodInvocationException(e.getMessage(), e);
         } catch (InvocationTargetException e) {
             Throwable ex = e.getTargetException();
-            throw new SwarmMethodInvocationException("Method invocation error: " + ex.getMessage(), ex);
+            throw new SwarmMethodInvocationException(ex.getMessage(), ex);
         }
     }
 

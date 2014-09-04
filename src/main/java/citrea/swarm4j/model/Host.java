@@ -54,6 +54,10 @@ public class Host extends Syncable implements Runnable {
         }
     }
 
+    public Host(SpecToken id) throws SwarmException {
+        this(id, null);
+    }
+
     @Override
     public void checkUplink() throws SwarmException {
         //do nothing for host
@@ -75,14 +79,14 @@ public class Host extends Syncable implements Runnable {
         } else {
             // process
             logger.debug("deliver({}, {})", spec.toString(), value.toJSONString());
-            if (!HOST.equals(spec.getType())) {
+            if (HOST.equals(spec.getType())) {
+                super.deliver(spec, value, source);
+            } else {
                 Spec typeid = spec.getTypeId();
                 Syncable obj = this.get(typeid);
                 if (obj != null) {
                     obj.deliver(spec, value, source);
                 }
-            } else {
-                super.deliver(spec, value, source);
             }
         }
     }
@@ -177,10 +181,6 @@ public class Host extends Syncable implements Runnable {
             }
             objon = objon.addToken(spec.getVersion()).addToken(ON);
             this.deliver(objon, evfilter, source);
-
-            // We don't do this as the object may have no state now.
-            // return o;
-            // Instead, use host.on('/Type#id.init', function(,,o) {})
         }
     }
 
@@ -295,7 +295,7 @@ public class Host extends Syncable implements Runnable {
                 mindist = dist;
             }
         }
-        if (closestPeer != null) uplinks.add(closestPeer);
+        if (closestPeer != null) uplinks.add(0, closestPeer);
         return uplinks;
     }
 
@@ -320,7 +320,9 @@ public class Host extends Syncable implements Runnable {
     // TODO Host event relay + PEX
 
     public void registerType(Class<? extends Syncable> type) throws SwarmException {
-        this.knownTypes.put(new SpecToken(SpecQuant.TYPE, type.getSimpleName()), new ReflectionTypeMeta(type));
+        TypeMeta typeMeta = new ReflectionTypeMeta(type);
+        logger.info("registerType: {}", typeMeta.getDescription());
+        this.knownTypes.put(new SpecToken(SpecQuant.TYPE, type.getSimpleName()), typeMeta);
     }
 
     public TypeMeta getTypeMeta(SpecToken typeToken) throws SwarmException {
@@ -430,11 +432,18 @@ public class Host extends Syncable implements Runnable {
     }
 
     public void start() {
-        this.storage.start();
+        if (this.storage != null) {
+            this.storage.start();
+        }
         new Thread(this).start();
     }
 
     public synchronized boolean ready() {
-        return this.storage.ready() && queueThread != null;
+        if (this.storage != null) {
+            if (!this.storage.ready()) {
+                return false;
+            }
+        }
+        return queueThread != null;
     }
 }

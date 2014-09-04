@@ -1,6 +1,7 @@
 package citrea.swarm4j.model.callback;
 
 import citrea.swarm4j.model.SwarmException;
+import citrea.swarm4j.model.Syncable;
 import citrea.swarm4j.model.spec.Spec;
 import citrea.swarm4j.model.spec.SpecToken;
 import citrea.swarm4j.model.value.JSONValue;
@@ -14,13 +15,25 @@ import citrea.swarm4j.model.value.JSONValue;
  */
 public class PendingUplink extends FilteringOpRecipient<Uplink> implements Uplink {
 
-    public PendingUplink(Uplink original) {
+    private Syncable object;
+    private SpecToken requestedVersion;
+
+    public PendingUplink(Syncable object, Uplink original, SpecToken requestedVersion) {
         super(original);
+        this.object = object;
+        this.requestedVersion = requestedVersion;
     }
 
     @Override
     protected boolean filter(Spec spec, JSONValue value, OpRecipient source) throws SwarmException {
-        return false; // skip all operations
+        // only response for my request
+        return requestedVersion.equals(spec.getVersion());
+    }
+
+    @Override
+    protected void deliverInternal(Spec spec, JSONValue value, OpRecipient source) throws SwarmException {
+        object.removeListener(this);
+        object.addUplink(this.getInner());
     }
 
     @Override

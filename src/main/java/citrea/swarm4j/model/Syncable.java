@@ -384,7 +384,7 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
 
         // stateless objects fire no events; essentially, on() is deferred
         if (this.version == null && !this.isUplinked()) {
-            this.listeners.add(
+            this.addListener(
                     new OpFilterRecipient(
                             new DeferredOpRecipient(spec, filterValue, source),
                             REON
@@ -418,7 +418,7 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
             }
         }
 
-        this.listeners.add(source);
+        this.addListener(source);
         // TODO repeated subscriptions: send a diff, otherwise ignore
     }
 
@@ -581,8 +581,10 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
             if (new_uplink == null) {
                 continue;
             }
-            this.uplinks.add(0, new PendingUplink(new_uplink));
-            new_uplink.deliver(this.newEventSpec(ON), new JSONValue(this.version().toString()), this);
+
+            Spec onSpec = this.newEventSpec(ON);
+            this.addUplink(new PendingUplink(this, new_uplink, onSpec.getVersion()));
+            new_uplink.deliver(onSpec, new JSONValue(this.version().toString()), this);
         }
     }
 
@@ -666,11 +668,16 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
         } else {
             sourceId = String.valueOf(source);
         }
-        logger.debug("{}->{} {} {}", spec.toString(), value.toJSONString(), object.getTypeId().toString(), sourceId);
+        logger.debug("log: {}->{} {} {}", spec.toString(), value.toJSONString(), object.getTypeId().toString(), sourceId);
     }
 
     public void once(JSONValue evfilter, OpRecipient fn) throws SwarmException, JSONException {
         this.on(evfilter, new OnceOpRecipient(this, fn));
+    }
+
+    public void addUplink(Uplink uplink) {
+        logger.debug("addUplink: {}", uplink);
+        this.uplinks.add(uplink);
     }
 
     public boolean isUplinked() {
@@ -688,9 +695,14 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
         return this.uplinks.indexOf(peer) > -1;
     }
 
-    public void removeListener(OpRecipient listener) {
+    protected void addListener(OpRecipient listener) {
+        logger.debug("addListener: {}", listener);
+        this.listeners.add(listener);
+    }
 
-        Iterator<OpRecipient> it = new ChainedIterators<OpRecipient>(
+    public void removeListener(OpRecipient listener) {
+        logger.debug("removeListener: {}", listener);
+        @SuppressWarnings("unchecked") Iterator<OpRecipient> it = new ChainedIterators<OpRecipient>(
                 this.uplinks.iterator(),
                 this.listeners.iterator()
         );
@@ -704,6 +716,7 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
 
             // @see FilteringOpRecipient#equals() implementation
             if (l.equals(listener)) {
+                logger.debug("removeListener: actualRemoved={}", l);
                 it.remove();
                 return;
             }
@@ -747,6 +760,15 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
 
         public OpRecipient getSource() {
             return getInner();
+        }
+
+        @Override
+        public String toString() {
+            return "DeferredOpRecipient{" +
+                    "spec=" + spec +
+                    ", filter=" + filter +
+                    ", inner=" + inner +
+                    '}';
         }
     }
 
