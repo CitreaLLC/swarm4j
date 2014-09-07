@@ -7,6 +7,7 @@ import citrea.swarm4j.model.meta.FieldMeta;
 import org.json.JSONException;
 
 import java.lang.reflect.Field;
+import java.util.Date;
 
 /**
  * Created with IntelliJ IDEA.
@@ -31,6 +32,8 @@ public class FieldWrapper implements FieldMeta {
         try {
             if (type.isAssignableFrom(JSONValue.class)) {
                 field.set(object, value);
+            } else if (String.class.isAssignableFrom(type)) {
+                field.set(object, value.getValueAsStr());
             } else if (Number.class.isAssignableFrom(type)) {
                 field.set(object, value.getValue());
             } else if (type.isPrimitive()) {

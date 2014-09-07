@@ -4,6 +4,7 @@ import citrea.swarm4j.model.spec.Spec;
 import citrea.swarm4j.model.value.JSONValue;
 
 import java.util.*;
+import java.util.Set;
 
 /**
  * Created with IntelliJ IDEA.
@@ -34,14 +35,18 @@ public class ModelLogDistillator implements LogDistillator {
         for (Spec spec : sets) {
             JSONValue val = oplog.get(spec);
             boolean notempty = false;
+            Set<String> fieldsToRemove = new HashSet<String>();
             for (String field : val.getFieldNames()) {
                 if (cumul.containsKey(field)) {
-                    val.removeFieldValue(field);
+                    fieldsToRemove.add(field);
                 } else {
                     JSONValue fieldVal = val.getFieldValue(field);
                     cumul.put(field, fieldVal);
                     notempty = !fieldVal.isEmpty(); //store last value of the field
                 }
+            }
+            for (String field : fieldsToRemove) {
+                val.removeFieldValue(field);
             }
             String source = spec.getVersion().getExt();
             if (!notempty) {

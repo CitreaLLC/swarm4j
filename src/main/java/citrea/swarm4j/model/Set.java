@@ -25,7 +25,7 @@ public class Set<T extends Syncable> extends Syncable {
     public static final String VALID = "";
 
     private Map<Spec, T> objects = new HashMap<Spec, T>();
-    private OpRecipient proxy = new SetObjectProxy();
+    private OpRecipient proxy = new ObjectProxy();
     private List<ObjListener> objectListeners = new ArrayList<ObjListener>();
 
     public Set(SpecToken id, Host host) throws SwarmException {
@@ -172,11 +172,16 @@ public class Set<T extends Syncable> extends Syncable {
         return ret;
     }
 
-    public class SetObjectProxy implements OpRecipient {
+    public class ObjectProxy implements OpRecipient {
 
         @Override
         public void deliver(Spec spec, JSONValue value, OpRecipient source) throws SwarmException {
             Set.this.onObjectEvent(spec, value, source);
+        }
+
+        @Override
+        public String toString() {
+            return "" + Set.this.getTypeId() + ".ObjectProxy";
         }
     }
 

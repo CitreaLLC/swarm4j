@@ -23,6 +23,7 @@ public class SpecToken implements Comparable<SpecToken> {
 
     public static final long EPOCH = 1262275200000L; // 1 Jan 2010 (milliseconds)
     public static final SpecToken ZERO_VERSION = new SpecToken("!0");
+    public static final SpecToken NO_ID = new SpecToken("#NO_ID");
 
     // "bare+ext"
     private String str;

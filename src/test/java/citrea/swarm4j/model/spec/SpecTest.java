@@ -1,5 +1,6 @@
 package citrea.swarm4j.model.spec;
 
+import citrea.swarm4j.model.Syncable;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -123,11 +124,18 @@ public class SpecTest {
 
     @Test
     public void testToString() throws Exception {
-        //TODO test
+        Spec spec = new Spec(
+                new SpecToken("/Mouse"),
+                new SpecToken("#s1"),
+                new SpecToken("!8oJOb03+s1~0"),
+                Syncable.ON
+        );
+        assertEquals("/Mouse#s1!8oJOb03+s1~0.on", spec.toString());
     }
 
     @Test
     public void testEquals() throws Exception {
-        //TODO test
+        Spec spec = new Spec("/Mouse#s1!8oJOb03+s1~0.on");
+        assertTrue("comparing to string", spec.equals("/Mouse#s1!8oJOb03+s1~0.on"));
     }
 }

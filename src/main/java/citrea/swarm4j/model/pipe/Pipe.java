@@ -34,26 +34,33 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
             Syncable.REOFF
     ));
 
+    protected PipeState state;
     protected Host host;
     protected OpStream stream;
     protected SpecToken peerId;
-    protected boolean handshaken;
+    protected Boolean isOnSent = null;
 
     public Pipe(Host host) {
         this.host = host;
-        this.handshaken = false;
+        this.state = PipeState.NEW;
     }
 
     @Override
     public void onMessage(String message) throws SwarmException, JSONException {
         if (logger.isDebugEnabled()) {
-            logger.debug("{} <= {}: {}", host.getId(), (handshaken ? this.peerId.toString() : "?"), message);
+            logger.debug("{} <= {}: {}", host.getId(), (!PipeState.NEW.equals(state) ? this.peerId.toString() : "?"), message);
         }
         for (Map.Entry<Spec, JSONValue> op : parse(message).entrySet()) {
-            if (!handshaken) {
-                this.processHandshake(op.getKey(), op.getValue());
-            } else {
-                this.host.deliver(op.getKey(), op.getValue(), this);
+            switch (state) {
+                case NEW:
+                    processHandshake(op.getKey(), op.getValue());
+                    break;
+                case HANDSHAKEN:
+                    host.deliver(op.getKey(), op.getValue(), this);
+                    break;
+                case CLOSED:
+                    logger.warn("{}.onMessage() but pipe closed", this);
+                    break;
             }
         }
     }
@@ -62,16 +69,33 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
     public void onClose() {
         this.stream.setSink(null);
         this.stream = null;
-        this.close();
+        this.close(null);
     }
 
     @Override
     public void deliver(Spec spec, JSONValue value, OpRecipient source) throws SwarmException {
         String message = Pipe.serialize(spec, value);
         if (logger.isDebugEnabled()) {
-            logger.debug("{} => {}: {}", host.getId(), (handshaken ? this.peerId.toString() : "?"), message);
+            logger.debug("{} => {}: {}", host.getId(), (!PipeState.NEW.equals(state) ? this.peerId.toString() : "?"), message);
         }
+        if (this.stream == null) {
+            return;
+        }
+
         this.stream.sendMessage(message);
+
+        if (Host.HOST.equals(spec.getType())) {
+            final SpecToken op = spec.getOp();
+            if (Syncable.ON.equals(op)) {
+                this.isOnSent = true;
+            } else if (Syncable.REON.equals(op)) {
+                this.isOnSent = false;
+            } else if (Syncable.OFF.equals(op)) {
+                this.close(null);
+            } else if (Syncable.REOFF.equals(op)) {
+                this.isOnSent = null;
+            }
+        }
     }
 
     protected void processHandshake(Spec spec, JSONValue value) throws SwarmException {
@@ -100,8 +124,49 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
         this.stream.setSink(this);
     }
 
-    public void close() {
-        //TODO pipe.close()
+    public void close(String error) {
+        logger.info("{} closing {}", this, error != null ? error : "correct");
+        /* TODO pipe reconnection
+        if (error != null && this.host != null && this.url) {
+            var uplink_uri = this.url,
+                    host = this.host,
+                    pipe_opts = this.opts;
+            //reconnect delay for next disconnection
+            pipe_opts.reconnectDelay = Math.min(30000, this.reconnectDelay << 1);
+            // schedule a retry
+            setTimeout(function () {
+                host.connect(uplink_uri, pipe_opts);
+            }, this.reconnectDelay);
+
+            this.url = null; //to prevent second reconnection timer
+        }
+        */
+        if (PipeState.HANDSHAKEN.equals(state)) {
+            if (this.isOnSent != null) {
+                // emulate normal off
+                Spec offspec = this.host.newEventSpec(this.isOnSent ? Syncable.OFF : Syncable.REOFF);
+                try {
+                    this.host.deliver(offspec, JSONValue.NULL, this);
+                } catch (SwarmException e) {
+                    logger.warn("{}.close(): Error delivering {} to host", this, offspec);
+                }
+            }
+            this.state = PipeState.CLOSED; // can't pass any more messages
+        }
+        /* TODO pipe reconnection
+        if (this.katimer) {
+            clearInterval(this.katimer);
+            this.katimer = null;
+        }
+        */
+        if (this.stream != null) {
+            try {
+                this.stream.close();
+            } catch (Exception e) {
+                // ignore
+            }
+            this.stream = null;
+        }
     }
 
     public void setStream(URI upstreamURI) {
@@ -112,8 +177,8 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
     @Override
     public void setPeerId(SpecToken id) {
         this.peerId = id;
-        this.handshaken = true;
-        logger.info("{} handshaken", this.toString());
+        this.state = PipeState.HANDSHAKEN;
+        logger.info("{} handshaken", this);
     }
 
     @Override
@@ -121,15 +186,20 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
         return peerId;
     }
 
+    private Spec typeId = null;
+
     @Override
     public Spec getTypeId() {
-        return handshaken ? new Spec(Host.HOST, peerId) : null;
+        if (typeId == null && PipeState.HANDSHAKEN.equals(state)) {
+            typeId = new Spec(Host.HOST, peerId);
+        }
+        return typeId;
     }
 
     @Override
     public String toString() {
         return "Pipe{ " + host.getId() +
-                " <=> " + (handshaken ? peerId : "?") +
+                " <=> " + (!PipeState.NEW.equals(state) ? peerId : "?") +
                 " }";
     }
 

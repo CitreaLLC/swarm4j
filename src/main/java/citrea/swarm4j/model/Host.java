@@ -78,10 +78,10 @@ public class Host extends Syncable implements Runnable {
             }
         } else {
             // process
-            logger.debug("deliver({}, {})", spec.toString(), value.toJSONString());
             if (HOST.equals(spec.getType())) {
                 super.deliver(spec, value, source);
             } else {
+                logger.debug("{} <= ({}, {}, {})", this, spec, value, source);
                 Spec typeid = spec.getTypeId();
                 Syncable obj = this.get(typeid);
                 if (obj != null) {
@@ -123,6 +123,7 @@ public class Host extends Syncable implements Runnable {
     }
 
     protected void addSource(Spec spec, Peer peer) throws SwarmException {
+        logger.debug("{}.addSource({}, {})", this, spec, peer);
         //TODO their time is off so tell them so  //FIXME ???
         Peer old = this.sources.get(peer.getTypeId());
         if (old != null) {
@@ -222,6 +223,7 @@ public class Host extends Syncable implements Runnable {
             //TODO log console.error('stream unknown', stream._id); //throw new Error
             return;
         }
+        logger.debug("{}.removeSource({}, {})", this, spec, peer);
         this.sources.remove(peer.getTypeId());
         for (Map.Entry<Spec, Syncable> sp : this.objects.entrySet()) {
             Syncable obj = sp.getValue();
@@ -369,7 +371,7 @@ public class Host extends Syncable implements Runnable {
         for (Map.Entry<Spec, Peer> entry : sources.entrySet()) {
             OpRecipient peer = entry.getValue();
             if (peer instanceof Pipe) {
-                ((Pipe) peer).close();
+                ((Pipe) peer).close(null);
             }
         }
     }

@@ -11,11 +11,11 @@ import citrea.swarm4j.model.value.JSONValue;
  *         Date: 18.08.2014
  *         Time: 16:58
  */
-public class OpFilterRecipient extends FilteringOpRecipient<OpRecipient> {
+public class OpFilter extends FilteringOpRecipient<OpRecipient> {
 
     private SpecToken op;
 
-    public OpFilterRecipient(OpRecipient inner, SpecToken op) {
+    public OpFilter(OpRecipient inner, SpecToken op) {
         super(inner);
         this.op = op;
     }
@@ -31,7 +31,7 @@ public class OpFilterRecipient extends FilteringOpRecipient<OpRecipient> {
 
     @Override
     public String toString() {
-        return "OpFilterRecipient{" +
+        return "OpFilter{" +
                 "op=" + op +
                 ", inner=" + inner +
                 '}';

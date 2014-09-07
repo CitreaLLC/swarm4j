@@ -1,7 +1,7 @@
 package citrea.swarm4j.model;
 
 import citrea.swarm4j.model.callback.FieldChangeOpRecipient;
-import citrea.swarm4j.model.callback.OpFilterRecipient;
+import citrea.swarm4j.model.callback.OpFilter;
 import citrea.swarm4j.model.callback.OpRecipient;
 import citrea.swarm4j.model.annotation.SwarmOperation;
 import citrea.swarm4j.model.annotation.SwarmOperationKind;
@@ -54,7 +54,7 @@ public class Model extends Syncable {
             if (fieldMeta != null) {
                 //TODO check if field exists with a given name
                 base = JSONValue.NULL;
-                source = new OpFilterRecipient(new FieldChangeOpRecipient(source, possibleFieldName), SET);
+                source = new OpFilter(new FieldChangeOpRecipient(source, possibleFieldName), SET);
             }
         }
         // this will delay response if we have no state yet

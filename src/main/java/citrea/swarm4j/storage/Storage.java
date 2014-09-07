@@ -87,7 +87,7 @@ public abstract class Storage implements Peer, Runnable {
                 throw new SwarmException(e.getMessage(), e);
             }
         } else {
-            logger.debug("deliver ({}, {})", spec.toString(), value.toJSONString());
+            logger.debug("{}.deliver({}, {}, {})", this, spec, value, source);
             final SpecToken op = spec.getOp();
             if (Syncable.ON.equals(op)) {
                 this.on(spec, value, source);
@@ -190,5 +190,10 @@ public abstract class Storage implements Peer, Runnable {
 
     public void start() {
         new Thread(this).start();
+    }
+
+    @Override
+    public String toString() {
+        return getClass().getSimpleName() + getPeerId();
     }
 }

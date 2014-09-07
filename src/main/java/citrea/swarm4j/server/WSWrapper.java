@@ -3,16 +3,11 @@ package citrea.swarm4j.server;
 import citrea.swarm4j.model.*;
 import citrea.swarm4j.model.pipe.OpStream;
 import citrea.swarm4j.model.pipe.OpStreamListener;
-import citrea.swarm4j.model.spec.Spec;
 import citrea.swarm4j.model.spec.SpecToken;
-import citrea.swarm4j.model.value.JSONValue;
 import org.java_websocket.WebSocket;
 import org.json.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
-
-import java.util.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -42,10 +37,7 @@ public class WSWrapper implements OpStream {
 
     @Override
     public void sendMessage(String message) {
-        MDC.put("pipeId", this.pipeId);
-        logger.debug("sendMessage message={}", message);
         ws.send(message);
-        MDC.remove("pipeId");
     }
 
     public void processMessage(String message) throws JSONException, SwarmException {
