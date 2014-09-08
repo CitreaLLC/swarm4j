@@ -10,6 +10,7 @@ import citrea.swarm4j.model.hash.SimpleHash;
 import citrea.swarm4j.model.meta.TypeMeta;
 import citrea.swarm4j.model.pipe.OpStream;
 import citrea.swarm4j.model.pipe.Pipe;
+import citrea.swarm4j.model.pipe.Plumber;
 import citrea.swarm4j.model.reflection.ReflectionTypeMeta;
 import citrea.swarm4j.storage.Storage;
 import citrea.swarm4j.model.spec.*;
@@ -29,7 +30,7 @@ import java.util.regex.Pattern;
  *         Date: 21.06.2014
  *         Time: 15:51
  */
-public class Host extends Syncable implements Runnable {
+public class Host extends Syncable implements HostPeer, Runnable {
     public static final SpecToken HOST = new SpecToken("/Host");
     private Map<SpecToken, TypeMeta> knownTypes = new HashMap<SpecToken, TypeMeta>();
 
@@ -42,7 +43,11 @@ public class Host extends Syncable implements Runnable {
     private int clockOffset = 0;
     private Map<Spec, Peer> sources = new HashMap<Spec, Peer>();
     private Storage storage = null;
+
+    // config
+    private Plumber plumber = new Plumber();
     private HashFunction hashFn = new SimpleHash();
+
 
     public Host(SpecToken id, Storage storage) throws SwarmException {
         super(id, null);
@@ -350,23 +355,28 @@ public class Host extends Syncable implements Runnable {
         return getTypeMeta(typeToken);
     }
 
+    @Override
     public void accept(OpStream stream) {
-        Pipe pipe = new Pipe(this);
+        Pipe pipe = new Pipe(this, plumber);
         pipe.setStream(stream);
     }
 
-    public void connect(URI upstreamURI) throws SwarmException {
-        Pipe pipe = new Pipe(this);
+    @Override
+    public void connect(URI upstreamURI, long reconnectTimeout) throws SwarmException {
+        Pipe pipe = new Pipe(this, plumber);
         pipe.setStream(upstreamURI);
+        pipe.setReconnectTimeout(reconnectTimeout);
         pipe.deliver(this.newEventSpec(ON), JSONValue.NULL, this);
     }
 
+    @Override
     public void connect(OpStream upstream) throws SwarmException {
-        Pipe pipe = new Pipe(this);
+        Pipe pipe = new Pipe(this, plumber);
         pipe.setStream(upstream);
         pipe.deliver(this.newEventSpec(ON), JSONValue.NULL, this);
     }
 
+    @Override
     public void disconnect() throws SwarmException {
         for (Map.Entry<Spec, Peer> entry : sources.entrySet()) {
             OpRecipient peer = entry.getValue();
@@ -411,7 +421,6 @@ public class Host extends Syncable implements Runnable {
             }
             queueThread = Thread.currentThread();
         }
-        queueThread.setName(this.getTypeId().toString());
 
         logger.info("started");
         try {
@@ -437,7 +446,8 @@ public class Host extends Syncable implements Runnable {
         if (this.storage != null) {
             this.storage.start();
         }
-        new Thread(this).start();
+        this.plumber.start();
+        new Thread(this, getPeerId().toString()).start();
     }
 
     public synchronized boolean ready() {

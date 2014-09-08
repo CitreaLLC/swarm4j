@@ -167,7 +167,6 @@ public abstract class Storage implements Peer, Runnable {
             }
             queueThread = Thread.currentThread();
         }
-        queueThread.setName("Stor" + this.getPeerId().toString());
 
         logger.info("started");
         try {
@@ -189,7 +188,8 @@ public abstract class Storage implements Peer, Runnable {
     }
 
     public void start() {
-        new Thread(this).start();
+        new Thread(this, "Stor" + this.getPeerId().toString())
+                .start();
     }
 
     @Override

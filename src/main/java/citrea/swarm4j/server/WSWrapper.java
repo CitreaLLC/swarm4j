@@ -3,7 +3,6 @@ package citrea.swarm4j.server;
 import citrea.swarm4j.model.*;
 import citrea.swarm4j.model.pipe.OpStream;
 import citrea.swarm4j.model.pipe.OpStreamListener;
-import citrea.swarm4j.model.spec.SpecToken;
 import org.java_websocket.WebSocket;
 import org.json.*;
 import org.slf4j.Logger;
@@ -23,11 +22,11 @@ public class WSWrapper implements OpStream {
 
     private final WebSocket ws;
     private final String pipeId;
-    private SpecToken peerId;
 
     public WSWrapper(WebSocket ws, String pipeId) {
         this.ws = ws;
         this.pipeId = pipeId;
+        logger.debug("{}.new", this);
     }
 
     @Override
@@ -37,19 +36,27 @@ public class WSWrapper implements OpStream {
 
     @Override
     public void sendMessage(String message) {
+        logger.debug("{}.sendMessage({})", this, message);
         ws.send(message);
     }
 
     public void processMessage(String message) throws JSONException, SwarmException {
-        if (this.sink == null) throw new IllegalStateException("No sink set for WSWrapper");
-        this.sink.onMessage(message);
+        if (this.sink != null) {
+            logger.debug("{}.processMessage({})", this, message);
+            this.sink.onMessage(message);
+        } else {
+            logger.info("{}.processMessage({}): no sink, closing websocket", this, message);
+            this.ws.close();
+        }
     }
 
     @Override
     public void close() {
+        logger.debug("{}.close()", this);
         if (sink != null) {
             sink.onClose();
         }
+        ws.close();
     }
 
     @Override
@@ -65,5 +72,10 @@ public class WSWrapper implements OpStream {
     @Override
     public int hashCode() {
         return ws.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "WS-" + this.pipeId;
     }
 }

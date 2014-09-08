@@ -33,8 +33,8 @@ public class WSServerImpl extends WebSocketServer {
     private final Host host;
     private Map<WebSocket, WSWrapper> knownPipes = new HashMap<WebSocket, WSWrapper>();
 
-    public WSServerImpl(int port, Host host, Utils utils) throws UnknownHostException {
-        super( new InetSocketAddress( port ) );
+    public WSServerImpl(int port, int decoders, Host host, Utils utils) throws UnknownHostException {
+        super(new InetSocketAddress( port ), decoders);
         this.utils = utils;
         this.host = host;
     }
@@ -42,7 +42,6 @@ public class WSServerImpl extends WebSocketServer {
     @Override
     public void onOpen( WebSocket conn, ClientHandshake handshake ) {
         final String wsId = utils.generateRandomId(6);
-        Thread.currentThread().setName("ws-" + wsId);
         WSWrapper stream = new WSWrapper(conn, wsId);
         host.accept(stream);
         knownPipes.put(conn, stream);

@@ -23,6 +23,9 @@ import java.util.Set;
  * @author aleksisha
  *         Date: 02.09.2014
  *         Time: 15:49
+ *
+ * TODO keep-alive
+ * TODO
  */
 public class Pipe implements OpStreamListener, OpRecipient, Peer {
     public static Logger logger = LoggerFactory.getLogger(Pipe.class);
@@ -34,22 +37,30 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
             Syncable.REOFF
     ));
 
-    protected PipeState state;
-    protected Host host;
+    protected final Plumber plumber;
+    protected State state;
+    protected long lastRecvTS = -1L;
+    protected long lastSendTS = -1L;
+
+    protected HostPeer host;
+    protected URI uri;
     protected OpStream stream;
     protected SpecToken peerId;
     protected Boolean isOnSent = null;
+    protected long reconnectTimeout;
 
-    public Pipe(Host host) {
+    public Pipe(HostPeer host, Plumber plumber) {
         this.host = host;
-        this.state = PipeState.NEW;
+        this.plumber = plumber;
+        this.state = State.NEW;
     }
 
     @Override
     public void onMessage(String message) throws SwarmException, JSONException {
         if (logger.isDebugEnabled()) {
-            logger.debug("{} <= {}: {}", host.getId(), (!PipeState.NEW.equals(state) ? this.peerId.toString() : "?"), message);
+            logger.debug("{} <= {}: {}", host.getPeerId(), (!State.NEW.equals(state) ? this.peerId.toString() : "?"), message);
         }
+        this.lastRecvTS = new Date().getTime();
         for (Map.Entry<Spec, JSONValue> op : parse(message).entrySet()) {
             switch (state) {
                 case NEW:
@@ -75,14 +86,8 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
     @Override
     public void deliver(Spec spec, JSONValue value, OpRecipient source) throws SwarmException {
         String message = Pipe.serialize(spec, value);
-        if (logger.isDebugEnabled()) {
-            logger.debug("{} => {}: {}", host.getId(), (!PipeState.NEW.equals(state) ? this.peerId.toString() : "?"), message);
-        }
-        if (this.stream == null) {
-            return;
-        }
 
-        this.stream.sendMessage(message);
+        sendMessage(message);
 
         if (Host.HOST.equals(spec.getType())) {
             final SpecToken op = spec.getOp();
@@ -98,6 +103,17 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
         }
     }
 
+    protected void sendMessage(String message) {
+        if (logger.isDebugEnabled()) {
+            logger.debug("{} => {}: {}", host.getPeerId(), (!State.NEW.equals(state) ? peerId.toString() : "?"), message);
+        }
+        if (stream == null) {
+            return;
+        }
+        stream.sendMessage(message);
+        lastSendTS = new Date().getTime();
+    }
+
     protected void processHandshake(Spec spec, JSONValue value) throws SwarmException {
         if (spec == null) {
             throw new IllegalArgumentException("handshake has no spec");
@@ -105,11 +121,11 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
         if (!Host.HOST.equals(spec.getType())) {
             throw new InvalidHandshakeSwarmException(spec, value);
         }
-        if (this.host.getId().equals(spec.getId())) {
+        if (this.host.getPeerId().equals(spec.getId())) {
             throw new SelfHandshakeSwarmException(spec, value);
         }
         SpecToken op = spec.getOp();
-        Spec evspec = spec.overrideToken(this.host.getId()).sort();
+        Spec evspec = spec.overrideToken(this.host.getPeerId()).sort();
 
         if (SUBSCRIPTION_OPERATIONS.contains(op)) { // access denied TODO
             this.setPeerId(spec.getId());
@@ -124,24 +140,18 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
         this.stream.setSink(this);
     }
 
+    public void setStream(URI upstreamURI) {
+        this.uri = upstreamURI;
+        //TODO pipe reconnection
+        throw new UnsupportedOperationException("Not realized yet");
+    }
+
     public void close(String error) {
         logger.info("{} closing {}", this, error != null ? error : "correct");
-        /* TODO pipe reconnection
-        if (error != null && this.host != null && this.url) {
-            var uplink_uri = this.url,
-                    host = this.host,
-                    pipe_opts = this.opts;
-            //reconnect delay for next disconnection
-            pipe_opts.reconnectDelay = Math.min(30000, this.reconnectDelay << 1);
-            // schedule a retry
-            setTimeout(function () {
-                host.connect(uplink_uri, pipe_opts);
-            }, this.reconnectDelay);
-
-            this.url = null; //to prevent second reconnection timer
+        if (error != null && this.uri != null && !State.CLOSED.equals(state)) {
+            plumber.reconnect(this);
         }
-        */
-        if (PipeState.HANDSHAKEN.equals(state)) {
+        if (State.HANDSHAKEN.equals(state)) {
             if (this.isOnSent != null) {
                 // emulate normal off
                 Spec offspec = this.host.newEventSpec(this.isOnSent ? Syncable.OFF : Syncable.REOFF);
@@ -151,14 +161,9 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
                     logger.warn("{}.close(): Error delivering {} to host", this, offspec);
                 }
             }
-            this.state = PipeState.CLOSED; // can't pass any more messages
+            this.state = State.CLOSED; // can't pass any more messages
         }
-        /* TODO pipe reconnection
-        if (this.katimer) {
-            clearInterval(this.katimer);
-            this.katimer = null;
-        }
-        */
+        // TODO plumber.stopKeepAlive ?
         if (this.stream != null) {
             try {
                 this.stream.close();
@@ -169,15 +174,11 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
         }
     }
 
-    public void setStream(URI upstreamURI) {
-        //TODO pipe reconnection
-        throw new UnsupportedOperationException("Not realized yet");
-    }
-
     @Override
     public void setPeerId(SpecToken id) {
         this.peerId = id;
-        this.state = PipeState.HANDSHAKEN;
+        this.state = State.HANDSHAKEN;
+        this.plumber.keepAlive(this);
         logger.info("{} handshaken", this);
     }
 
@@ -190,7 +191,7 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
 
     @Override
     public Spec getTypeId() {
-        if (typeId == null && PipeState.HANDSHAKEN.equals(state)) {
+        if (typeId == null && State.HANDSHAKEN.equals(state)) {
             typeId = new Spec(Host.HOST, peerId);
         }
         return typeId;
@@ -198,8 +199,8 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
 
     @Override
     public String toString() {
-        return "Pipe{ " + host.getId() +
-                " <=> " + (!PipeState.NEW.equals(state) ? peerId : "?") +
+        return "Pipe{ " + host.getPeerId() +
+                " <=> " + (!State.NEW.equals(state) ? peerId : "?") +
                 " }";
     }
 
@@ -239,4 +240,18 @@ public class Pipe implements OpStreamListener, OpRecipient, Peer {
         return operations;
     }
 
+    public void setReconnectTimeout(long reconnectTimeout) {
+        this.reconnectTimeout = reconnectTimeout;
+    }
+
+    /**
+     * Created with IntelliJ IDEA.
+     *
+     * @author aleksisha
+     *         Date: 07.09.2014
+     *         Time: 23:48
+     */
+    public static enum State {
+        NEW, HANDSHAKEN, CLOSED
+    }
 }

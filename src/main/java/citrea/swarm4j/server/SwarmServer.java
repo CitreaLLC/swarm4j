@@ -28,6 +28,9 @@ public class SwarmServer {
     @Value("${port:8080}")
     private int port;
 
+    @Value("${decoders:1}")
+    private int decoders = 1;
+
     private WSServerImpl wsServer;
     private Host host;
 
@@ -49,7 +52,7 @@ public class SwarmServer {
             throw new RuntimeException("'host' property not deliver");
         }
         host.start();
-        wsServer = new WSServerImpl(port, host, utils);
+        wsServer = new WSServerImpl(port, decoders, host, utils);
         wsServer.start();
         logger.info("started on port: " + port);
     }
