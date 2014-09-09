@@ -196,4 +196,12 @@ public abstract class Storage implements Peer, Runnable {
     public String toString() {
         return getClass().getSimpleName() + getPeerId();
     }
+
+    public void stop() {
+        synchronized (this) {
+            if (queueThread != null) {
+                queueThread.interrupt();
+            }
+        }
+    }
 }

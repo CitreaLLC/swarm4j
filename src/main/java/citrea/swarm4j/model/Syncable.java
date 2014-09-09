@@ -6,6 +6,8 @@ import citrea.swarm4j.model.annotation.SwarmOperationKind;
 import citrea.swarm4j.model.meta.FieldMeta;
 import citrea.swarm4j.model.meta.OperationMeta;
 import citrea.swarm4j.model.meta.TypeMeta;
+import citrea.swarm4j.model.oplog.LogDistillator;
+import citrea.swarm4j.model.oplog.NoLogDistillator;
 import citrea.swarm4j.model.spec.*;
 import citrea.swarm4j.util.ChainedIterators;
 import citrea.swarm4j.model.value.JSONValue;

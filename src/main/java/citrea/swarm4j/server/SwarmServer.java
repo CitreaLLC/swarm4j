@@ -45,6 +45,7 @@ public class SwarmServer {
     public void stop() throws IOException, InterruptedException {
         logger.info("stopping");
         wsServer.stop();
+        host.stop();
     }
 
     public void start() throws UnknownHostException {

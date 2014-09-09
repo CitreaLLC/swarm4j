@@ -1,4 +1,4 @@
-package citrea.swarm4j.model;
+package citrea.swarm4j.model.oplog;
 
 import citrea.swarm4j.model.spec.Spec;
 import citrea.swarm4j.model.value.JSONValue;

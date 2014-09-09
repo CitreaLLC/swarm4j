@@ -5,7 +5,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Date;
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created with IntelliJ IDEA.
@@ -21,7 +23,7 @@ public final class Plumber implements Runnable {
     private static final long keepAliveTimeout = 60000L;
 
     private Thread queueThread;
-    final PriorityBlockingQueue<Event> events = new PriorityBlockingQueue<Event>();
+    final DelayQueue<Event> events = new DelayQueue<Event>();
 
     public void start() {
         new Thread(this, "plumber").start();
@@ -46,17 +48,10 @@ public final class Plumber implements Runnable {
 
         logger.info("started");
 
-        // TODO optimize (utilizes too much CPU time)
         while (!queueThread.isInterrupted()) {
             try {
                 Event event = events.take();
-                long now = new Date().getTime();
-                if (event.time <= now) {
-                    event.run();
-                } else {
-                    events.put(event);
-                    Thread.sleep(500); // TODO config
-                }
+                event.run();
             } catch (InterruptedException e) {
                 break;
             }
@@ -72,19 +67,15 @@ public final class Plumber implements Runnable {
 
     public void keepAlive(Pipe pipe) {
         long now = new Date().getTime();
-        synchronized (events) {
-            events.offer(new KeepAliveEvent(pipe, now + keepAliveTimeout >> 2)); // TODO + Math.random() * 100
-        }
+        events.put(new KeepAliveEvent(pipe, now + keepAliveTimeout >> 2)); // TODO + Math.random() * 100
     }
 
     public void reconnect(Pipe pipe) {
         long now = new Date().getTime();
-        synchronized (events) {
-            events.offer(new ReconnectEvent(pipe, now + pipe.reconnectTimeout));
-        }
+        events.put(new ReconnectEvent(pipe, now + pipe.reconnectTimeout));
     }
 
-    private abstract class Event implements Comparable<Event> {
+    private abstract class Event implements Delayed {
         protected Pipe pipe;
         protected long time;
 
@@ -96,8 +87,20 @@ public final class Plumber implements Runnable {
         public abstract void run();
 
         @Override
-        public int compareTo(Event other) {
-            long delta = time - other.time;
+        public long getDelay(TimeUnit timeUnit) {
+            long remaining = time - new Date().getTime();
+            return timeUnit.convert(remaining, TimeUnit.MILLISECONDS);
+        }
+
+        @Override
+        public int compareTo(Delayed other) {
+            final long delta;
+            if (other instanceof Event) {
+                Event otherEvent = (Event) other;
+                delta = time - otherEvent.time;
+            } else {
+                delta = getDelay(TimeUnit.MILLISECONDS) - other.getDelay(TimeUnit.MILLISECONDS);
+            }
             if (delta == 0L) {
                 return 0;
             } else {

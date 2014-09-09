@@ -1,4 +1,4 @@
-package citrea.swarm4j.model;
+package citrea.swarm4j.model.oplog;
 
 import citrea.swarm4j.model.spec.Spec;
 import citrea.swarm4j.model.value.JSONValue;
@@ -21,7 +21,7 @@ public class ModelLogDistillator implements LogDistillator {
      * necessary subset of it.
      * As a side effect, distillLog allows up to handle some partial
      * order issues (see _ops.set).
-     * @see Model#set(citrea.swarm4j.model.spec.Spec, citrea.swarm4j.model.value.JSONValue)
+     * @see citrea.swarm4j.model.Model#set(citrea.swarm4j.model.spec.Spec, citrea.swarm4j.model.value.JSONValue)
      * @return {*} distilled log {spec:true}
      */
     @Override

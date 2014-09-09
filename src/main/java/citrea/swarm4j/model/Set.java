@@ -4,6 +4,7 @@ import citrea.swarm4j.model.annotation.SwarmOperation;
 import citrea.swarm4j.model.annotation.SwarmOperationKind;
 import citrea.swarm4j.model.annotation.SwarmType;
 import citrea.swarm4j.model.callback.OpRecipient;
+import citrea.swarm4j.model.oplog.ModelLogDistillator;
 import citrea.swarm4j.model.spec.Spec;
 import citrea.swarm4j.model.spec.SpecPattern;
 import citrea.swarm4j.model.spec.SpecToken;

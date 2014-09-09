@@ -34,7 +34,7 @@ public class WSServerImpl extends WebSocketServer {
     private Map<WebSocket, WSWrapper> knownPipes = new HashMap<WebSocket, WSWrapper>();
 
     public WSServerImpl(int port, int decoders, Host host, Utils utils) throws UnknownHostException {
-        super(new InetSocketAddress( port ), decoders);
+        super(new InetSocketAddress(port), decoders);
         this.utils = utils;
         this.host = host;
     }

@@ -458,4 +458,15 @@ public class Host extends Syncable implements HostPeer, Runnable {
         }
         return queueThread != null;
     }
+
+    public void stop() {
+        synchronized (this) {
+            if (queueThread != null) {
+                queueThread.interrupt();
+            }
+        }
+        this.storage.stop();
+        this.plumber.stop();
+    }
+
 }
