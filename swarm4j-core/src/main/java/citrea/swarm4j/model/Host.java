@@ -443,6 +443,7 @@ public class Host extends Syncable implements HostPeer, Runnable {
     }
 
     public void start() {
+        logger.info("{}.start()", this);
         if (this.storage != null) {
             this.storage.start();
         }
@@ -460,6 +461,7 @@ public class Host extends Syncable implements HostPeer, Runnable {
     }
 
     public void stop() {
+        logger.info("{}.stop()", this);
         synchronized (this) {
             if (queueThread != null) {
                 queueThread.interrupt();

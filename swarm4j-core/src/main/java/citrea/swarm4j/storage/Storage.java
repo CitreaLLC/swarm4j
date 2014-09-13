@@ -7,7 +7,7 @@ import citrea.swarm4j.model.Syncable;
 import citrea.swarm4j.model.callback.OpRecipient;
 import citrea.swarm4j.model.callback.Peer;
 import citrea.swarm4j.model.spec.Spec;
-import citrea.swarm4j.model.spec.SpecMap;
+import citrea.swarm4j.model.spec.VersionVector;
 import citrea.swarm4j.model.spec.SpecToken;
 import citrea.swarm4j.model.value.JSONValue;
 import org.slf4j.Logger;
@@ -121,7 +121,7 @@ public abstract class Storage implements Peer, Runnable {
      * Derive version vector from a state of a Syncable object.
      * This is not a method as it needs to be applied to a flat JSON object.
      * @see citrea.swarm4j.model.Syncable#version()
-     * @see citrea.swarm4j.model.spec.SpecMap
+     * @see citrea.swarm4j.model.spec.VersionVector
      * @return string representation of SpecMap
      */
     public static String stateVersionVector(JSONValue state) {
@@ -142,7 +142,7 @@ public abstract class Storage implements Peer, Runnable {
         for (String spec : tail.getFieldNames()) {
             str.append(spec);
         }
-        return new SpecMap(str.toString()).toString();
+        return new VersionVector(str.toString()).toString();
     }
 
     @Override
@@ -188,6 +188,7 @@ public abstract class Storage implements Peer, Runnable {
     }
 
     public void start() {
+        logger.info("{}.start()", this);
         new Thread(this, "Stor" + this.getPeerId().toString())
                 .start();
     }
@@ -198,6 +199,7 @@ public abstract class Storage implements Peer, Runnable {
     }
 
     public void stop() {
+        logger.info("{}.stop()", this);
         synchronized (this) {
             if (queueThread != null) {
                 queueThread.interrupt();

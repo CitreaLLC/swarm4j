@@ -9,19 +9,19 @@ import java.util.*;
  *         Date: 21.06.2014
  *         Time: 20:48
  */
-public class SpecMap {
+public class VersionVector {
 
     private Map<String, String> map = new HashMap<String, String>();
 
-    public SpecMap(Spec vec) {
+    public VersionVector(Spec vec) {
         this.add(vec);
     }
 
-    public SpecMap(String vector) {
+    public VersionVector(String vector) {
         this.add(new Spec(vector));
     }
 
-    public SpecMap() {
+    public VersionVector() {
 
     }
 

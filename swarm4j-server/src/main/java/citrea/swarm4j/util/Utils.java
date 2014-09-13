@@ -1,7 +1,6 @@
 package citrea.swarm4j.util;
 
 import org.apache.commons.codec.binary.Base64;
-import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
 
@@ -12,7 +11,6 @@ import java.security.SecureRandom;
  *         Date: 25/10/13
  *         Time: 19:30
  */
-@Component
 public class Utils {
 
     public String generateRandomId(int bytesNum) {

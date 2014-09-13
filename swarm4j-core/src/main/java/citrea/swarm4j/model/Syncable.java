@@ -275,12 +275,12 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
 
     /**
      * @return the version vector for this object
-     * @see SpecMap
+     * @see citrea.swarm4j.model.spec.VersionVector
      */
-    public SpecMap version() {
+    public VersionVector version() {
         // distillLog() may drop some operations; still, those need to be counted
         // in the version vector; so, their Lamport ids must be saved in this.vector
-        SpecMap map = new SpecMap();
+        VersionVector map = new VersionVector();
         if (this.version != null) {
             map.add(this.version);
         }
@@ -311,7 +311,7 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
         this.distillLog(); // TODO optimize?
         Map<String, JSONValue> patch = new HashMap<String, JSONValue>();
         if (base != null && !SpecToken.ZERO_VERSION.equals(base)) {
-            SpecMap map = new SpecMap(base.toString());
+            VersionVector map = new VersionVector(base.toString());
             Map<String, JSONValue> tail = new HashMap<String, JSONValue>();
             for (Map.Entry<Spec, JSONValue> op : this.oplog.entrySet()) {
                 Spec spec = op.getKey();

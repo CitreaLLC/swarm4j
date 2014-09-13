@@ -136,6 +136,7 @@ public class SpecTest {
     @Test
     public void testEquals() throws Exception {
         Spec spec = new Spec("/Mouse#s1!8oJOb03+s1~0.on");
+        //noinspection EqualsBetweenInconvertibleTypes
         assertTrue("comparing to string", spec.equals("/Mouse#s1!8oJOb03+s1~0.on"));
     }
 }
