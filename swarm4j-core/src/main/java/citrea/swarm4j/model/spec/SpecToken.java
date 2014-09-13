@@ -99,14 +99,17 @@ public class SpecToken implements Comparable<SpecToken> {
 
     public static int base2int(String token) {
         Matcher m = Spec.RE_BASE64.matcher(token);
-        if (!m.matches()) {
+        if (!m.find()) {
             throw new IllegalArgumentException("Not a base64 token");
         }
+
         int ret = 0;
-        MatchResult mr = m.toMatchResult();
-        for (int i = mr.groupCount() - 1, shift = 0; i >= 0; i++, shift += 6) {
-            ret += Spec.BASE64.indexOf(mr.group(i)) << shift;
-        }
+        int shift = (token.length() - 1) * 6;
+        do {
+            int idx = Spec.BASE64.indexOf(m.group());
+            ret += idx << shift;
+            shift -= 6;
+        } while (m.find());
         return ret;
     }
 

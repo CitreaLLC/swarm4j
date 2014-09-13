@@ -74,7 +74,7 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
         this.typeMeta = this.getTypeMeta();
         this.type = this.typeMeta.getTypeToken();
         if (this.id == null) {
-            this.id = new SpecToken(SpecQuant.ID, this.host.time());
+            this.id = this.host.time().overrideQuant(SpecQuant.ID);
             this.version = SpecToken.ZERO_VERSION.toString();
         }
         this.host.register(this);
@@ -193,7 +193,7 @@ public abstract class Syncable implements SomeSyncable, SubscriptionAware {
      */
     public Spec newEventSpec(SpecToken op) {
         return this.getTypeId()
-                .addToken(new SpecToken(SpecQuant.VERSION, this.host.time()))
+                .addToken(this.host.time())
                 .addToken(op);
     }
 

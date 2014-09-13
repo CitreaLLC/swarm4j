@@ -5,7 +5,6 @@ import citrea.swarm4j.model.SwarmException;
 import citrea.swarm4j.model.Syncable;
 import citrea.swarm4j.model.callback.OpRecipient;
 import citrea.swarm4j.model.spec.Spec;
-import citrea.swarm4j.model.spec.SpecQuant;
 import citrea.swarm4j.model.spec.SpecToken;
 import citrea.swarm4j.model.value.JSONValue;
 import org.json.JSONArray;
@@ -79,10 +78,6 @@ public class FileStorage extends Storage {
         }
         this.id = new SpecToken("#file"); //path.basename(dir);
 
-        //for time() method
-        this.lastTs = "";
-        this.tsSeq = 0;
-
         this.logCount = 0;
         this.loadTails();
         this.rotateLog();
@@ -145,7 +140,7 @@ public class FileStorage extends Storage {
         // Only a live object can integrate log tail into the state,
         // so we use this trick. As object lifecycles differ in Host
         // and FileStorage we can't safely access the object directly.
-        final Spec onSpec = ti.addToken(new SpecToken(SpecQuant.VERSION, this.time())).addToken(Syncable.ON);
+        final Spec onSpec = ti.addToken(this.time()).addToken(Syncable.ON);
         this.host.deliver(onSpec, new JSONValue(".init!0"), this);
     }
 
@@ -211,13 +206,9 @@ public class FileStorage extends Storage {
     }
 
     public String stateFileName(Spec spec) {
-        StringBuilder base = new StringBuilder();
-        base.append(this.dir);
-        base.append("/");
-        base.append(spec.getType().getBody());
-        base.append("/");
-        base.append(spec.getId().getBody());
-        return base.toString(); // TODO hashing (issue: may break FAT caching?)
+        return this.dir + "/" +
+                spec.getType().getBody() + "/" +
+                spec.getId().getBody(); // TODO hashing (issue: may break FAT caching?)
     }
 
     // Once the current log file exceeds some size, we start a new one.

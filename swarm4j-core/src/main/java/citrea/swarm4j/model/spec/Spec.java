@@ -23,7 +23,7 @@ public class Spec implements Comparable<Spec> {
 
     public static final String BASE64 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz~";
     public static final String RS_BASE64 = "[0-9A-Za-z_~]";
-    public static final Pattern RE_BASE64 = Pattern.compile(RS_BASE64, Pattern.MULTILINE);
+    public static final Pattern RE_BASE64 = Pattern.compile(RS_BASE64);
 
     private SpecToken[] tokens;
 

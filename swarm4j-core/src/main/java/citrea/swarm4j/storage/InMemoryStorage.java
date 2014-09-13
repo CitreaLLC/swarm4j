@@ -5,10 +5,8 @@ import citrea.swarm4j.model.SwarmException;
 import citrea.swarm4j.model.Syncable;
 import citrea.swarm4j.model.callback.OpRecipient;
 import citrea.swarm4j.model.spec.Spec;
-import citrea.swarm4j.model.spec.SpecQuant;
 import citrea.swarm4j.model.spec.SpecToken;
 import citrea.swarm4j.model.value.JSONValue;
-import com.sun.corba.se.impl.orbutil.concurrent.Sync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

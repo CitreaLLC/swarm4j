@@ -6,6 +6,8 @@ import citrea.swarm4j.model.SwarmException;
 import citrea.swarm4j.model.Syncable;
 import citrea.swarm4j.model.callback.OpRecipient;
 import citrea.swarm4j.model.callback.Peer;
+import citrea.swarm4j.model.clocks.Clock;
+import citrea.swarm4j.model.clocks.SecondPreciseClock;
 import citrea.swarm4j.model.spec.Spec;
 import citrea.swarm4j.model.spec.VersionVector;
 import citrea.swarm4j.model.spec.SpecToken;
@@ -13,7 +15,6 @@ import citrea.swarm4j.model.value.JSONValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -34,14 +35,13 @@ public abstract class Storage implements Peer, Runnable {
     private Thread queueThread;
 
     protected Host host;
+    protected Clock clock;
     protected SpecToken id;
-    protected String lastTs = "";
-    protected int tsSeq = 0;
-    private String version;
-    private long clockOffset = 0L;
 
     protected Storage(SpecToken id) {
         this.id = id;
+        // TODO allow to setup clock
+        this.clock = new SecondPreciseClock(id.getBare());
     }
 
     public void setHost(Host host) {
@@ -58,23 +58,8 @@ public abstract class Storage implements Peer, Runnable {
      * then sequence number is added so a timestamp may be more than 5
      * chars. The id of the Host (+user~session) is appended to the ts.
      */
-    public String time() {
-        long d = new Date().getTime() - SpecToken.EPOCH + this.clockOffset;
-        String ts = SpecToken.int2base((int) (d / 1000), 5);
-        String res = ts;
-        if (ts.equals(this.lastTs)) {
-            res += SpecToken.int2base(++this.tsSeq, 2); // max ~4000Hz
-        } else {
-            this.tsSeq = 0;
-        }
-        res += '+' + this.getTypeId().getId().getBody();
-        this.lastTs = ts;
-        this.version = "!" + res;
-        return res;
-    }
-
-    public String getVersion() {
-        return this.version;
+    public SpecToken time() {
+        return this.clock.issueTimestamp();
     }
 
     @Override

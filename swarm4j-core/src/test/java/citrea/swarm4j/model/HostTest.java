@@ -60,8 +60,8 @@ public class HostTest {
 
     @Test
     public void testNewVersion() throws Exception {
-        SpecToken ver1 = new SpecToken(SpecQuant.VERSION, this.host.time());
-        SpecToken ver2 = new SpecToken(SpecQuant.VERSION, this.host.time());
+        SpecToken ver1 = this.host.time();
+        SpecToken ver2 = this.host.time();
         assertNotEquals(ver1, ver2);
     }
 
@@ -146,14 +146,14 @@ public class HostTest {
     @Test
     public void test2c_version_ids() throws Exception {
         logger.info("2.c version ids");
-        String ts1 = host.time();
+        String ts1 = host.time().toString();
         Duck louie = host.get(new Spec("/Duck#louie"));
         louie.set(new JSONValue(Collections.singletonMap("age", new JSONValue(3))));
         Thread.sleep(10);
-        String ts2 = host.time();
+        String ts2 = host.time().toString();
         assertTrue(ts1.compareTo(ts2) < 0);
         assertNotNull(louie.version);
-        String vid = louie.version.substring(1);
+        String vid = louie.version;
         assertTrue(ts1.compareTo(vid) < 0);
         assertTrue(ts2.compareTo(vid) > 0);
     }
